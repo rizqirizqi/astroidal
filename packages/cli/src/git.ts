@@ -17,7 +17,13 @@ function run(
     cwd,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, GIT_PAGER: "cat", PAGER: "cat", GH_PAGER: "cat" },
+    env: {
+      ...process.env,
+      GIT_PAGER: "cat",
+      PAGER: "cat",
+      GH_PAGER: "cat",
+      GLAB_PAGER: "cat",
+    },
   });
   if (result.error) {
     if (allowFailure) return null;
@@ -55,6 +61,18 @@ export function tryGh(cwd: string, args: string[]): string | null {
 
 export function ghAvailable(): boolean {
   return run("gh", ["--version"], process.cwd(), true) !== null;
+}
+
+export function glab(cwd: string, args: string[]): string {
+  return run("glab", args, cwd, false) ?? "";
+}
+
+export function tryGlab(cwd: string, args: string[]): string | null {
+  return run("glab", args, cwd, true);
+}
+
+export function glabAvailable(): boolean {
+  return run("glab", ["--version"], process.cwd(), true) !== null;
 }
 
 export function repoRoot(start: string): string {

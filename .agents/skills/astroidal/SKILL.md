@@ -62,6 +62,10 @@ A batch is one merged map. Do not review the pull requests as separate reports.
 
 Call `gh` for what this review still needs. The map already did the local-first reads, so do not list the same files again, refetch a diff it already stored, or poll checks. A few targeted calls are fine, such as `gh pr view` when a title, base, or body is missing. Do not spam `gh`, and do not comment on a pull request, approve it, or request reviewers.
 
+## GitLab
+
+Call `glab` for what this review still needs. The map already did the local-first reads, so do not list the same files again, refetch a diff it already stored, or poll pipelines. A few targeted calls are fine, such as `glab mr view` when a title, base, or body is missing. Do not spam `glab`, and do not comment on a merge request, approve it, or request reviewers.
+
 ## Search for bugs
 
 Read, in order:

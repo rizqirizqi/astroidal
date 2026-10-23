@@ -56,7 +56,7 @@ npx --yes astroidal graph --commit HEAD
 npx --yes astroidal graph --staged
 ```
 
-Local branches are read with git. `gh` lists open pull requests and fetches a diff whose branch is not local. `astroidal --help` covers the rest, including `--author`, `--base`, `--unstaged`, and `--repo`.
+Local branches are read with git. `gh` lists open GitHub pull requests and fetches a diff whose branch is not local. `glab` does the same for GitLab merge requests. The host comes from the origin remote, or from the glab config for a self-hosted GitLab. `astroidal --help` covers the rest, including `--author`, `--base`, `--unstaged`, and `--repo`.
 
 ## Repository
 

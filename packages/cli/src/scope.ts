@@ -1,26 +1,23 @@
 import { readFileSync, statSync } from "node:fs";
 import { parseUnifiedDiff, synthesizeAddition } from "./diff.js";
 import {
-  CommandError,
-  gh,
-  ghAvailable,
-  git,
-  repoRoot,
-  tryGh,
-  tryGit,
-} from "./git.js";
+  cliName,
+  detectForge,
+  diffArgs,
+  forgeAvailable,
+  headArgs,
+  listArgs,
+  readPull,
+  readPullList,
+  runForge,
+  tryForge,
+  viewArgs,
+  type Forge,
+  type PullMeta,
+} from "./forge.js";
+import { CommandError, git, repoRoot, tryGit } from "./git.js";
 import { insideRoot, toPosix } from "./paths.js";
 import type { ChangeUnit, GraphOptions, ParsedFile } from "./types.js";
-
-interface GhPull {
-  number: number;
-  title?: string;
-  headRefName: string;
-  baseRefName: string;
-  url?: string;
-  author?: { login?: string };
-  labels?: Array<{ name?: string }>;
-}
 
 interface SelectedPull {
   number?: number;
@@ -37,8 +34,6 @@ export interface ScopeResult {
   notes: string[];
   commands: string[];
 }
-
-const GH_FIELDS = "number,title,headRefName,baseRefName,url,author,labels";
 
 export function resolveScope(
   start: string,
@@ -62,17 +57,24 @@ export function resolveScope(
   if (options.staged) units.push(loadWorktree(root, "staged", commands));
   if (options.unstaged) units.push(loadWorktree(root, "unstaged", commands));
 
+  const needsForge =
+    options.prs.length > 0 ||
+    options.open ||
+    options.authors.length > 0 ||
+    options.labels.length > 0 ||
+    options.stack;
+  const forge = needsForge ? detectForge(root) : "github";
   const selected: SelectedPull[] = [];
   if (options.open || options.authors.length > 0 || options.labels.length > 0) {
-    selected.push(...listOpen(root, options, commands, notes));
+    selected.push(...listOpen(root, options, commands, notes, forge));
   }
   for (const number of options.prs)
-    selected.push(viewExplicit(root, number, commands));
+    selected.push(viewExplicit(root, number, commands, forge));
   if (options.stack)
-    selected.push(...walkStack(root, options, commands, notes));
+    selected.push(...walkStack(root, options, commands, notes, forge));
 
   for (const pull of dedupePulls(selected, options.limit, notes)) {
-    units.push(loadPull(root, pull, commands, notes));
+    units.push(loadPull(root, pull, commands, notes, forge));
   }
 
   if (!targeted) {
@@ -104,64 +106,46 @@ function listOpen(
   options: GraphOptions,
   commands: string[],
   notes: string[],
+  forge: Forge,
 ): SelectedPull[] {
-  if (!ghAvailable()) {
-    throw new CommandError(
-      "Listing open pull requests needs the GitHub CLI (gh) and an authenticated repository. Review the current branch, or pass --pr for branches that are already local.",
-    );
-  }
+  if (!forgeAvailable(forge))
+    throw new CommandError(unavailable(forge, "list"));
   const fetchLimit =
     options.labels.length > 0 ? Math.max(options.limit, 100) : options.limit;
-  const args = [
-    "pr",
-    "list",
-    "--state",
-    "open",
-    "--limit",
-    String(fetchLimit),
-    "--json",
-    GH_FIELDS,
-  ];
-  if (options.authors.length === 1)
-    args.push("--author", options.authors[0] ?? "");
-  if (options.base) args.push("--base", shortName(options.base));
-  record(commands, "gh", args);
-  const pulls = parseGh<GhPull[]>(gh(root, args), "pull request list");
+  const args = listArgs(
+    forge,
+    fetchLimit,
+    options.authors.length === 1 ? options.authors[0] : undefined,
+    options.base ? shortName(options.base) : undefined,
+  );
+  record(commands, cliName(forge), args);
+  const label = forge === "gitlab" ? "merge request list" : "pull request list";
+  const pulls = readPullList(runForge(root, forge, args), forge, label);
   const matched = pulls.filter((pull) => matchesFilter(pull, options));
-  if (pulls.length === fetchLimit)
+  if (pulls.length === fetchLimit) {
+    const service = forge === "gitlab" ? "GitLab" : "GitHub";
+    const noun = forge === "gitlab" ? "merge requests" : "pull requests";
     notes.push(
-      `GitHub returned ${fetchLimit} open pull requests. Raise --limit if the batch is larger.`,
+      `${service} returned ${fetchLimit} open ${noun}. Raise --limit if the batch is larger.`,
     );
-  return matched.map((pull) => ({
-    number: pull.number,
-    title: pull.title,
-    url: pull.url,
-    head: pull.headRefName,
-    base: pull.baseRefName,
-    origin: "open",
-  }));
+  }
+  return matched.map((pull) => toSelected(pull, "open"));
 }
 
 function viewExplicit(
   root: string,
   number: number,
   commands: string[],
+  forge: Forge,
 ): SelectedPull {
-  if (!ghAvailable())
-    throw new CommandError(
-      `Reading pull request ${number} needs the GitHub CLI (gh).`,
-    );
-  const args = ["pr", "view", String(number), "--json", GH_FIELDS];
-  record(commands, "gh", args);
-  const pull = parseGh<GhPull>(gh(root, args), `pull request ${number}`);
-  return {
-    number: pull.number,
-    title: pull.title,
-    url: pull.url,
-    head: pull.headRefName,
-    base: pull.baseRefName,
-    origin: "explicit",
-  };
+  if (!forgeAvailable(forge))
+    throw new CommandError(unavailable(forge, "view", number));
+  const args = viewArgs(forge, number);
+  record(commands, cliName(forge), args);
+  const label =
+    forge === "gitlab" ? `merge request ${number}` : `pull request ${number}`;
+  const pull = readPull(runForge(root, forge, args), forge, label);
+  return toSelected(pull, "explicit");
 }
 
 function walkStack(
@@ -169,6 +153,7 @@ function walkStack(
   options: GraphOptions,
   commands: string[],
   notes: string[],
+  forge: Forge,
 ): SelectedPull[] {
   const chain: SelectedPull[] = [];
   const seen = new Set<string>();
@@ -176,7 +161,7 @@ function walkStack(
   let branch = currentBranch(root);
   while (branch && !seen.has(branch) && chain.length < 15) {
     seen.add(branch);
-    const meta = lookupHead(root, branch, commands);
+    const meta = lookupHead(root, branch, commands, forge);
     const base = shortName(
       meta?.baseRefName ?? upstreamBase(root, branch) ?? stop,
     );
@@ -203,25 +188,18 @@ function lookupHead(
   root: string,
   head: string,
   commands: string[],
-): GhPull | null {
-  if (!ghAvailable() || head === "HEAD") return null;
-  const args = [
-    "pr",
-    "list",
-    "--head",
-    head,
-    "--state",
-    "open",
-    "--limit",
-    "1",
-    "--json",
-    GH_FIELDS,
-  ];
-  record(commands, "gh", args);
-  const text = tryGh(root, args);
+  forge: Forge,
+): PullMeta | null {
+  if (head === "HEAD" || !forgeAvailable(forge)) return null;
+  const args = headArgs(forge, head);
+  record(commands, cliName(forge), args);
+  const text = tryForge(root, forge, args);
   if (!text) return null;
-  const pulls = parseGh<GhPull[]>(text, `pull request for ${head}`);
-  return pulls[0] ?? null;
+  const label =
+    forge === "gitlab"
+      ? `merge request for ${head}`
+      : `pull request for ${head}`;
+  return readPullList(text, forge, label)[0] ?? null;
 }
 
 function dedupePulls(
@@ -254,23 +232,25 @@ function loadPull(
   pull: SelectedPull,
   commands: string[],
   notes: string[],
+  forge: Forge,
 ): ChangeUnit {
   const headRef = resolveRef(root, pull.head);
   const baseRef = resolveRef(root, pull.base);
   let files: ParsedFile[] = [];
   let source: ChangeUnit["source"] = "local";
   if (headRef && baseRef) files = diffRange(root, baseRef, headRef, commands);
-  else if (pull.number && ghAvailable()) {
-    const args = ["pr", "diff", String(pull.number)];
-    record(commands, "gh", args);
-    files = parseUnifiedDiff(gh(root, args));
+  else if (pull.number && forgeAvailable(forge)) {
+    const args = diffArgs(forge, pull.number);
+    record(commands, cliName(forge), args);
+    files = parseUnifiedDiff(runForge(root, forge, args));
     source = "remote-diff";
+    const command = forge === "gitlab" ? "glab mr diff" : "gh pr diff";
     notes.push(
-      `PR ${pull.number} is not checked out locally. Its diff was read with one gh pr diff.`,
+      `PR ${pull.number} is not checked out locally. Its diff was read with one ${command}.`,
     );
   } else {
     notes.push(
-      `Could not read ${pull.head}. Check the branch out locally, or authenticate gh.`,
+      `Could not read ${pull.head}. Check the branch out locally, or authenticate ${cliName(forge)}.`,
     );
   }
   return {
@@ -437,10 +417,39 @@ function upstreamBase(root: string, branch: string): string | null {
   return shortName(upstream);
 }
 
-function matchesFilter(pull: GhPull, options: GraphOptions): boolean {
+function toSelected(
+  pull: PullMeta,
+  origin: SelectedPull["origin"],
+): SelectedPull {
+  return {
+    number: pull.number,
+    title: pull.title,
+    url: pull.url,
+    head: pull.headRefName,
+    base: pull.baseRefName,
+    origin,
+  };
+}
+
+function unavailable(
+  forge: Forge,
+  action: "list" | "view",
+  number?: number,
+): string {
+  if (forge === "gitlab") {
+    return action === "list"
+      ? "Listing open merge requests needs the GitLab CLI (glab) and an authenticated repository. Review the current branch, or pass --pr for branches that are already local."
+      : `Reading merge request ${number} needs the GitLab CLI (glab).`;
+  }
+  return action === "list"
+    ? "Listing open pull requests needs the GitHub CLI (gh) and an authenticated repository. Review the current branch, or pass --pr for branches that are already local."
+    : `Reading pull request ${number} needs the GitHub CLI (gh).`;
+}
+
+function matchesFilter(pull: PullMeta, options: GraphOptions): boolean {
   if (
     options.authors.length > 0 &&
-    !options.authors.includes(pull.author?.login ?? "")
+    !options.authors.includes(pull.author ?? "")
   )
     return false;
   if (
@@ -450,11 +459,7 @@ function matchesFilter(pull: GhPull, options: GraphOptions): boolean {
   )
     return false;
   if (options.labels.length > 0) {
-    const names = new Set(
-      (pull.labels ?? [])
-        .map((label) => label.name)
-        .filter((name): name is string => Boolean(name)),
-    );
+    const names = new Set(pull.labels);
     if (!options.labels.some((label) => names.has(label))) return false;
   }
   return true;
@@ -469,16 +474,6 @@ function shortName(ref: string): string {
 
 function record(commands: string[], bin: string, args: string[]): void {
   commands.push([bin, ...args].join(" "));
-}
-
-function parseGh<T>(text: string, label: string): T {
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new CommandError(
-      `Could not parse the GitHub CLI response for ${label}.`,
-    );
-  }
 }
 
 export function readRepoFile(root: string, relPath: string): string | null {

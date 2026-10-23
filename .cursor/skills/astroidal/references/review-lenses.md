@@ -25,7 +25,7 @@ Write the description as what breaks, in one or two sentences, with the symbol n
 
 ## Spec
 
-Use the pull request title and body, the commit messages, and any spec the change names. Read a missing title or body with one `gh pr view`. Do not poll checks.
+Use the pull request title and body, the commit messages, and any spec the change names. Read a missing title or body with one `gh pr view` on GitHub, or one `glab mr view` on GitLab. Do not poll checks.
 
 - The diff contradicts a stated behavior. Quote the line that does the wrong thing. Category `contract` or `logic`.
 - A changed function claims to implement a requirement and skips it. Quote that function. Category `logic`.

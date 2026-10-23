@@ -610,6 +610,15 @@ exit 0
 `,
   );
   chmodSync(join(bin, "gh"), 0o755);
+  writeFileSync(
+    join(bin, "glab"),
+    `#!/bin/sh
+echo "$@" >> "$GLAB_LOG"
+exit 1
+`,
+  );
+  chmodSync(join(bin, "glab"), 0o755);
+  git(root, ["remote", "add", "origin", "https://github.com/acme/widgets.git"]);
   git(root, ["checkout", "-b", "feature"]);
   writeFileSync(
     join(root, "src", "auth.ts"),
@@ -619,10 +628,13 @@ exit 0
   git(root, ["commit", "-m", "feature"]);
   const previousPath = process.env.PATH;
   const previousLog = process.env.GH_LOG;
+  const previousGlabLog = process.env.GLAB_LOG;
+  const glabLog = join(root, "glab.log");
   const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
   const previousHome = process.env.HOME;
   process.env.PATH = `${bin}${delimiter}${previousPath ?? ""}`;
   process.env.GH_LOG = log;
+  process.env.GLAB_LOG = glabLog;
   process.env.HOME = home;
   const previous = process.cwd();
   try {
@@ -636,11 +648,244 @@ exit 0
     const calls = readFileSync(log, "utf8");
     assert.match(calls, /pr view 12/);
     assert.doesNotMatch(calls, /pr diff/);
+    assert.equal(existsSync(glabLog), false);
   } finally {
     process.chdir(previous);
     process.env.PATH = previousPath;
     if (previousLog === undefined) delete process.env.GH_LOG;
     else process.env.GH_LOG = previousLog;
+    if (previousGlabLog === undefined) delete process.env.GLAB_LOG;
+    else process.env.GLAB_LOG = previousGlabLog;
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("gitlab merge requests use the local branch instead of glab mr diff", () => {
+  const root = makeRepo();
+  const bin = join(root, "bin");
+  mkdirSync(bin);
+  const log = join(root, "glab.log");
+  writeFileSync(
+    join(bin, "glab"),
+    `#!/bin/sh
+echo "$@" >> "$GLAB_LOG"
+if [ "$1" = "--version" ]; then
+  echo "glab version test"
+  exit 0
+fi
+if [ "$1" = "mr" ] && [ "$2" = "view" ]; then
+  printf '%s\\n' '{"iid":12,"title":"Fix login","source_branch":"feature","target_branch":"main","web_url":"https://gitlab.com/group/app/-/merge_requests/12","author":{"username":"ada"},"labels":["risk"]}'
+  exit 0
+fi
+if [ "$1" = "mr" ] && [ "$2" = "diff" ]; then
+  echo "unexpected diff" >&2
+  exit 1
+fi
+printf '%s\\n' '[]'
+exit 0
+`,
+  );
+  chmodSync(join(bin, "glab"), 0o755);
+  git(root, ["remote", "add", "origin", "git@gitlab.com:group/app.git"]);
+  git(root, ["checkout", "-b", "feature"]);
+  writeFileSync(
+    join(root, "src", "auth.ts"),
+    "export function login(password) {\n  if (!password) return null\n  return db.query(password)\n}\nexport function audit(password) {\n  return password\n}\n",
+  );
+  git(root, ["add", "."]);
+  git(root, ["commit", "-m", "feature"]);
+  const previousPath = process.env.PATH;
+  const previousLog = process.env.GLAB_LOG;
+  const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
+  const previousHome = process.env.HOME;
+  process.env.PATH = `${bin}${delimiter}${previousPath ?? ""}`;
+  process.env.GLAB_LOG = log;
+  process.env.HOME = home;
+  const previous = process.cwd();
+  try {
+    process.chdir(root);
+    assert.equal(main(["graph", "--pr", "12"]), 0);
+    const graph = JSON.parse(
+      readFileSync(join(root, ".astroidal", "graph.json"), "utf8"),
+    ) as Graph;
+    assert.equal(graph.units[0]?.label, "PR 12");
+    assert.equal(
+      graph.units[0]?.url,
+      "https://gitlab.com/group/app/-/merge_requests/12",
+    );
+    assert.ok(graph.files.some((file) => file.path === "src/auth.ts"));
+    const calls = readFileSync(log, "utf8");
+    assert.match(calls, /mr view 12 --output json/);
+    assert.doesNotMatch(calls, /mr diff/);
+  } finally {
+    process.chdir(previous);
+    process.env.PATH = previousPath;
+    if (previousLog === undefined) delete process.env.GLAB_LOG;
+    else process.env.GLAB_LOG = previousLog;
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("a self-hosted gitlab merge request is read with glab mr diff", () => {
+  const root = makeRepo();
+  const bin = join(root, "bin");
+  mkdirSync(bin);
+  const log = join(root, "glab.log");
+  writeFileSync(
+    join(bin, "glab"),
+    `#!/bin/sh
+echo "$@" >> "$GLAB_LOG"
+if [ "$1" = "--version" ]; then
+  echo "glab version test"
+  exit 0
+fi
+if [ "$1" = "mr" ] && [ "$2" = "view" ]; then
+  printf '%s\\n' '{"iid":9,"title":"Remote fix","source_branch":"absent","target_branch":"main","web_url":"https://git.example.com/group/app/-/merge_requests/9","author":"ada","labels":["risk"]}'
+  exit 0
+fi
+if [ "$1" = "mr" ] && [ "$2" = "diff" ]; then
+  cat <<'EOF'
+diff --git a/src/auth.ts b/src/auth.ts
+--- a/src/auth.ts
++++ b/src/auth.ts
+@@ -1,3 +1,3 @@
+ export function login(password) {
+-  return db.query(password)
++  return db.query("SELECT " + password)
+ }
+EOF
+  exit 0
+fi
+printf '%s\\n' '[]'
+exit 0
+`,
+  );
+  chmodSync(join(bin, "glab"), 0o755);
+  git(root, ["remote", "add", "origin", "git@git.example.com:group/app.git"]);
+  const previousPath = process.env.PATH;
+  const previousLog = process.env.GLAB_LOG;
+  const previousConfig = process.env.GLAB_CONFIG_DIR;
+  const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
+  const configDir = join(home, "glab-cli");
+  mkdirSync(configDir);
+  writeFileSync(
+    join(configDir, "config.yml"),
+    "hosts:\n    git.example.com:\n        user: ada\n",
+  );
+  const previousHome = process.env.HOME;
+  process.env.PATH = `${bin}${delimiter}${previousPath ?? ""}`;
+  process.env.GLAB_LOG = log;
+  process.env.GLAB_CONFIG_DIR = configDir;
+  process.env.HOME = home;
+  const previous = process.cwd();
+  try {
+    process.chdir(root);
+    assert.equal(main(["graph", "--pr", "9"]), 0);
+    const graph = JSON.parse(
+      readFileSync(join(root, ".astroidal", "graph.json"), "utf8"),
+    ) as Graph;
+    assert.equal(graph.units[0]?.source, "remote-diff");
+    assert.ok(graph.files.some((file) => file.path === "src/auth.ts"));
+    assert.match(
+      graph.notes.join("\n"),
+      /PR 9 is not checked out locally. Its diff was read with one glab mr diff./,
+    );
+    const calls = readFileSync(log, "utf8");
+    assert.match(calls, /mr view 9 --output json/);
+    assert.match(calls, /mr diff 9 --raw --color=never/);
+    assert.doesNotMatch(calls, /\bgh\b/);
+  } finally {
+    process.chdir(previous);
+    process.env.PATH = previousPath;
+    if (previousLog === undefined) delete process.env.GLAB_LOG;
+    else process.env.GLAB_LOG = previousLog;
+    if (previousConfig === undefined) delete process.env.GLAB_CONFIG_DIR;
+    else process.env.GLAB_CONFIG_DIR = previousConfig;
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("open gitlab merge requests filter by author and label", () => {
+  const root = makeRepo();
+  const bin = join(root, "bin");
+  mkdirSync(bin);
+  const log = join(root, "glab.log");
+  writeFileSync(
+    join(bin, "glab"),
+    `#!/bin/sh
+echo "$@" >> "$GLAB_LOG"
+if [ "$1" = "--version" ]; then
+  echo "glab version test"
+  exit 0
+fi
+if [ "$1" = "mr" ] && [ "$2" = "list" ]; then
+  printf '%s\\n' '[{"iid":3,"title":"Risk","source_branch":"feature","target_branch":"main","web_url":"https://gitlab.com/group/app/-/merge_requests/3","author":{"username":"ada"},"labels":["risk"]},{"iid":4,"title":"Other","source_branch":"other","target_branch":"develop","web_url":"https://gitlab.com/group/app/-/merge_requests/4","author":{"username":"bob"},"labels":["docs"]}]'
+  exit 0
+fi
+echo "unexpected $1 $2" >&2
+exit 1
+`,
+  );
+  chmodSync(join(bin, "glab"), 0o755);
+  git(root, ["remote", "add", "origin", "https://gitlab.com/group/app.git"]);
+  git(root, ["checkout", "-b", "feature"]);
+  writeFileSync(
+    join(root, "src", "auth.ts"),
+    "export function login(password) {\n  if (!password) return null\n  return db.query(password)\n}\n",
+  );
+  git(root, ["add", "."]);
+  git(root, ["commit", "-m", "feature"]);
+  const previousPath = process.env.PATH;
+  const previousLog = process.env.GLAB_LOG;
+  const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
+  const previousHome = process.env.HOME;
+  process.env.PATH = `${bin}${delimiter}${previousPath ?? ""}`;
+  process.env.GLAB_LOG = log;
+  process.env.HOME = home;
+  const previous = process.cwd();
+  try {
+    process.chdir(root);
+    assert.equal(
+      main([
+        "graph",
+        "--open",
+        "--author",
+        "ada",
+        "--label",
+        "risk",
+        "--base",
+        "main",
+      ]),
+      0,
+    );
+    const graph = JSON.parse(
+      readFileSync(join(root, ".astroidal", "graph.json"), "utf8"),
+    ) as Graph;
+    assert.deepEqual(
+      graph.units.map((unit) => unit.label),
+      ["PR 3"],
+    );
+    const calls = readFileSync(log, "utf8");
+    assert.match(
+      calls,
+      /mr list --output json --per-page 100 --author ada --target-branch main/,
+    );
+    assert.doesNotMatch(calls, /--label/);
+    assert.doesNotMatch(calls, /mr diff/);
+  } finally {
+    process.chdir(previous);
+    process.env.PATH = previousPath;
+    if (previousLog === undefined) delete process.env.GLAB_LOG;
+    else process.env.GLAB_LOG = previousLog;
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
     rmSync(root, { recursive: true, force: true });

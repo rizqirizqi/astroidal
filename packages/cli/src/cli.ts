@@ -40,7 +40,9 @@ graph
   --repo path         Repository to map. Defaults to the current directory.
 
 With no scope flags, a dirty worktree maps uncommitted changes. A clean
-branch maps that branch against the default base.
+branch maps that branch against the default base. GitHub pull requests use
+gh. GitLab merge requests use glab when the origin host is GitLab, or when
+that host is listed in the glab config.
 
 rank
   --findings file     Defaults to .astroidal/findings.json
