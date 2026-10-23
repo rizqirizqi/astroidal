@@ -1,39 +1,14 @@
 {
-  "name": "astroidal",
-  "version": "0.1.0",
-  "description": "AI code review map, scorer, and helper. Draws the blast radius, hands an agent a bug map, and scores what survives. Run with npx, without adding a dependency.",
+  "name": "astroidal-workspace",
+  "private": true,
   "type": "module",
-  "bin": {
-    "astroidal": "./dist/cli.js"
-  },
-  "files": [
-    "dist",
-    "skills",
-    "README.md"
+  "workspaces": [
+    "packages/*",
+    "apps/*"
   ],
-  "engines": {
-    "node": ">=20"
-  },
-  "keywords": [
-    "ai",
-    "ai-code-review",
-    "code-review",
-    "code-review-tool",
-    "bug-map",
-    "ast",
-    "cli",
-    "pull-request",
-    "static-analysis"
-  ],
-  "license": "MIT",
-  "author": "Mgs. M. Rizqi Fadhlurrahman <rizqirizqi23@gmail.com>",
   "scripts": {
-    "build": "tsc && cp src/sky-script.js dist/sky-script.js",
-    "test": "npm run build && node --test dist/*.test.js",
-    "prepack": "npm run build && rm -f dist/*.test.js"
-  },
-  "devDependencies": {
-    "@types/node": "^24.10.0",
-    "typescript": "^5.9.3"
+    "build": "npm run build -w astroidal",
+    "test": "npm run test -w astroidal",
+    "dev:site": "npm run dev -w astroidal-site"
   }
 }

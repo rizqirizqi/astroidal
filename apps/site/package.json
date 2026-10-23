@@ -1,0 +1,31 @@
+{
+  "name": "astroidal-site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "env -u INIT_CWD webstorio dev",
+    "status": "env -u INIT_CWD webstorio status",
+    "update": "env -u INIT_CWD webstorio update",
+    "push": "env -u INIT_CWD webstorio push",
+    "deploy": "env -u INIT_CWD webstorio push --publish",
+    "lint": "prettier --check .",
+    "lint:fix": "prettier --write .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@webstorio/cli": "latest",
+    "lucide-react": "^0.575.0",
+    "prettier": "^3.7.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.0"
+  }
+}
