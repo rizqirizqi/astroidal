@@ -107,6 +107,43 @@ export function parseUnifiedDiff(diff: string): ParsedFile[] {
   return files.filter((file) => file.path && file.path !== 'unknown')
 }
 
+export function countChangedSpan(patch: string, side: 'new' | 'old', start: number, end: number): number {
+  if (!patch || end < start) return 0
+  let oldLine = 0
+  let newLine = 0
+  let inHunk = false
+  let count = 0
+  for (const line of patch.split(/\r?\n/)) {
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line)
+    if (hunk) {
+      oldLine = Number(hunk[1])
+      newLine = Number(hunk[2])
+      inHunk = true
+      continue
+    }
+    if (!inHunk || line.startsWith('\\')) continue
+    if (line.startsWith('diff --git ') || line.startsWith('index ') || line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('new file ') || line.startsWith('deleted file ') || line.startsWith('rename ') || line.startsWith('similarity ') || line.startsWith('old mode ') || line.startsWith('new mode ')) {
+      inHunk = false
+      continue
+    }
+    if (line.startsWith('+')) {
+      if (side === 'new' && newLine >= start && newLine <= end) count += 1
+      newLine += 1
+      continue
+    }
+    if (line.startsWith('-')) {
+      if (side === 'old' && oldLine >= start && oldLine <= end) count += 1
+      oldLine += 1
+      continue
+    }
+    if (line.startsWith(' ')) {
+      oldLine += 1
+      newLine += 1
+    }
+  }
+  return count
+}
+
 export function changedLines(patch: string): { added: string[]; removed: string[] } {
   const added: string[] = []
   const removed: string[] = []
@@ -143,6 +180,7 @@ export function reconstructSide(patch: string, side: 'new' | 'old'): string {
 
 export function synthesizeAddition(path: string, text: string): ParsedFile {
   const body = text.split(/\r?\n/)
+  if (text.endsWith('\n')) body.pop()
   const quoted = (prefix: string) => {
     const value = `${prefix}${path}`
     return /[\s"]/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value

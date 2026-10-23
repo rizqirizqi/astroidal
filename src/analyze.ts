@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import { changedLines, reconstructSide } from './diff.js'
+import { changedLines, countChangedSpan, reconstructSide } from './diff.js'
 import { tryGit } from './git.js'
 import { isNoise } from './noise.js'
 import { toPosix } from './paths.js'
@@ -253,6 +253,7 @@ export function buildMap(scope: ScopeResult): BuildResult {
       deletions: file.deletions,
       binary: file.binary,
       partial: file.partial,
+      patch: file.patch,
     })),
     neighbors,
     nodes,
@@ -355,7 +356,19 @@ function pairSymbols(file: BuiltFile, fresh: SyntaxSymbol[], previous: SyntaxSym
     const complexity = 1 + symbol.decisions
     const delta = complexity - (prior ? 1 + prior.decisions : 0)
     total += delta
-    return { ...symbol, path: file.path, complexity, complexityDelta: delta, units: file.units, prs: file.prs, spectral: file.spectral }
+    return {
+      ...symbol,
+      path: file.path,
+      complexity,
+      complexityDelta: delta,
+      additions: countChangedSpan(file.patch, 'new', symbol.line, symbol.endLine),
+      deletions: prior ? countChangedSpan(file.patch, 'old', prior.line, prior.endLine) : 0,
+      oldLine: prior?.line,
+      oldEndLine: prior?.endLine,
+      units: file.units,
+      prs: file.prs,
+      spectral: file.spectral,
+    }
   })
   for (const [key, prior] of oldByKey) {
     if (used.has(key)) continue
@@ -364,9 +377,10 @@ function pairSymbols(file: BuiltFile, fresh: SyntaxSymbol[], previous: SyntaxSym
     symbols.push({
       ...prior,
       path: file.path,
-      endLine: prior.line,
       complexity: 0,
       complexityDelta: -complexity,
+      additions: 0,
+      deletions: countChangedSpan(file.patch, 'old', prior.line, prior.endLine),
       decisions: 0,
       calls: [],
       units: file.units,
@@ -553,6 +567,10 @@ function buildNodes(files: BuiltFile[], neighbors: GraphNeighbor[]): GraphNode[]
         prs: file.prs,
         calls: symbol.calls,
         excerpt: excerpt(symbol.signature.startsWith('removed ') ? file.oldText : file.text, symbol.line, symbol.endLine, 12),
+        additions: symbol.additions,
+        deletions: symbol.deletions,
+        oldLine: symbol.oldLine,
+        oldEndLine: symbol.oldEndLine,
       })
     }
   }
@@ -577,6 +595,8 @@ function buildNodes(files: BuiltFile[], neighbors: GraphNeighbor[]): GraphNode[]
       prs: [],
       calls: [],
       excerpt: '',
+      additions: 0,
+      deletions: 0,
     })
   }
   return nodes
@@ -600,6 +620,8 @@ function fileNode(file: BuiltFile): GraphNode {
     prs: file.prs,
     calls: [],
     excerpt: excerpt(file.text || file.oldText, 1, 12, 12),
+    additions: file.additions,
+    deletions: file.deletions,
   }
 }
 

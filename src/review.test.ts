@@ -6,7 +6,7 @@ import { delimiter, join } from 'node:path'
 import { test } from 'node:test'
 import { buildMap, exposureScore, scoreReview } from './analyze.js'
 import { main, parseArgs } from './cli.js'
-import { parseUnifiedDiff } from './diff.js'
+import { countChangedSpan, parseUnifiedDiff } from './diff.js'
 import { readEvidence, writeEvidence } from './evidence.js'
 import { writePackets } from './packets.js'
 import { rankFindings } from './rank.js'
@@ -19,6 +19,22 @@ test('parseArgs splits pull request lists and repeated labels', () => {
   assert.deepEqual(parsed.flags.get('pr'), ['12,18'])
   assert.deepEqual(parsed.flags.get('label'), ['risk', 'security'])
   assert.deepEqual(parsed.flags.get('open'), ['true'])
+})
+
+test('changed-span counts additions and deletions inside a symbol', () => {
+  const patch = `diff --git a/src/auth.ts b/src/auth.ts
+--- a/src/auth.ts
++++ b/src/auth.ts
+@@ -1,4 +1,4 @@
+ export function login(password) {
+   if (!password) return null
+-  return db.query(password)
++  return db.query("SELECT " + password)
+ }
+`
+  assert.equal(countChangedSpan(patch, 'new', 1, 4), 1)
+  assert.equal(countChangedSpan(patch, 'old', 1, 4), 1)
+  assert.equal(countChangedSpan(patch, 'new', 1, 2), 0)
 })
 
 test('unified diff keeps a rename and a new file', () => {
@@ -229,7 +245,13 @@ test('graph and rank review a worktree without adding a dependency', () => {
     assert.equal(main(['init']), 0)
     assert.equal(main(['graph']), 0)
     const graph = JSON.parse(readFileSync(join(root, '.astroidal', 'graph.json'), 'utf8')) as Graph
-    assert.ok(graph.files.some((file) => file.path === 'src/auth.ts'))
+    const auth = graph.files.find((file) => file.path === 'src/auth.ts')
+    const login = graph.nodes.find((node) => node.name === 'login' && node.path === 'src/auth.ts')
+    assert.ok(auth)
+    assert.match(auth.patch, /SELECT/)
+    assert.equal(login?.additions, 1)
+    assert.equal(login?.deletions, 1)
+    assert.ok((login?.complexity ?? 0) >= 2)
     assert.ok(graph.files.some((file) => file.path === 'src/Login.tsx'))
     assert.ok(graph.neighbors.some((neighbor) => neighbor.path === 'src/app.ts'))
     assert.equal(readFileSync(join(root, 'package.json'), 'utf8').includes('astroidal'), false)
@@ -266,6 +288,11 @@ test('graph and rank review a worktree without adding a dependency', () => {
     assert.match(html, /Fix first/)
     assert.match(html, /Impact surface/)
     assert.match(html, /A-001/)
+    assert.match(html, /id="view-tree" class="is-on"/)
+    assert.match(html, /id="symbol-list" hidden/)
+    assert.match(html, /id="symbol-tree"/)
+    assert.doesNotMatch(html, /id="symbol-tree" hidden/)
+    assert.match(html, /complexity \d+ <em>/)
     const bugMap = readFileSync(join(root, '.astroidal', 'packets', 'bug-map.md'), 'utf8')
     assert.match(bugMap, /Security bugs/)
     assert.match(bugMap, /src\/auth\.ts/)

@@ -85,7 +85,7 @@ export function renderConstellation(graph: Graph): string {
     .batch button { flex: 0 0 auto; }
     .batch button:hover, .lens-controls button:hover, .view-toggle button:hover, .symbols button:hover, summary:hover { border-color: rgba(0, 242, 254, 0.55); }
     .batch button.is-on { border-color: var(--cyan); color: var(--cyan); background: rgba(0, 242, 254, 0.08); }
-    main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; min-height: 0; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, 520px); min-height: 0; }
     .sky, aside { min-height: 0; }
     .sky { position: relative; min-width: 0; outline: none; display: flex; flex-direction: column; }
     .sky:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
@@ -135,10 +135,31 @@ export function renderConstellation(graph: Graph): string {
     .units li { display: grid; gap: 2px; font-size: 13px; }
     .units em, .quiet, .symbols small, .tree-file-name { color: var(--muted); font-style: normal; }
     .units em, .tree-file-name { font-size: 12px; }
+    .symbol-meta { display: inline-flex; gap: 8px; align-items: baseline; flex: 0 0 auto; margin-left: auto; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .symbol-meta .add { color: #7ee787; }
+    .symbol-meta .del { color: #ff9b94; }
+    .symbol-meta .cx, .symbol-meta em { color: var(--violet-ink); font-style: normal; }
     #detail { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0 0 20px; background: rgba(255, 255, 255, 0.03); }
     #detail h2 { color: var(--ink); letter-spacing: -0.03em; text-transform: none; font-size: 22px; margin: 4px 0; }
     #detail .eyebrow { margin-bottom: 4px; }
     #detail pre { white-space: pre-wrap; margin: 10px 0 0; font: 12px/1.5 "JetBrains Mono", ui-monospace, monospace; background: rgba(0, 0, 0, 0.28); padding: 10px; border-radius: 10px; }
+    .diff-review { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .diff-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); }
+    .diff-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 560; }
+    .diff-note, .diff-empty { margin: 0; padding: 8px 10px; color: var(--muted); font-size: 12px; }
+    .diff-body { max-height: min(68vh, 640px); overflow: auto; background: #070b12; }
+    .diff-table { width: max-content; min-width: 100%; border-collapse: collapse; font: 12px/1.55 "JetBrains Mono", ui-monospace, monospace; }
+    .diff-table td { padding: 0; vertical-align: top; }
+    .diff-table .ln, .diff-table .sign { color: #6d7c93; background: rgba(0, 0, 0, 0.28); user-select: none; text-align: right; }
+    .diff-table .ln { min-width: 2.4em; padding: 0 8px; }
+    .diff-table .sign { width: 1.2em; padding: 0 4px 0 6px; text-align: center; }
+    .diff-table .code { padding: 0 12px 0 8px; white-space: pre; color: #d5deec; }
+    .diff-table tr.add { background: rgba(46, 160, 67, 0.22); }
+    .diff-table tr.add .sign, .diff-table tr.add .code { color: #7ee787; }
+    .diff-table tr.del { background: rgba(248, 81, 73, 0.2); }
+    .diff-table tr.del .sign, .diff-table tr.del .code { color: #ffb1ab; }
+    .diff-table tr.hunk td { padding: 8px 10px; color: #c5b6e0; background: rgba(127, 0, 255, 0.16); }
+    .diff-table tr.is-mark { box-shadow: inset 3px 0 0 var(--cyan); }
     .alert { color: var(--amber); }
     .alerts { display: grid; gap: 8px; }
     .alerts li { padding: 10px 10px 10px 12px; border-left: 3px solid var(--cyan); border-radius: 0 10px 10px 0; background: rgba(255, 255, 255, 0.03); }
@@ -154,22 +175,22 @@ export function renderConstellation(graph: Graph): string {
     .view-toggle button.is-on { border-color: var(--cyan); color: var(--cyan); background: rgba(0, 242, 254, 0.08); }
     .finder { width: 100%; margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.25); }
     .index { display: grid; gap: 6px; margin: 0; }
-    .symbols button { border-radius: 12px; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; width: 100%; }
+    .symbols button { border-radius: 12px; display: flex; align-items: center; gap: 8px; text-align: left; padding: 7px 10px; width: 100%; }
     .symbols button.is-on { border-color: var(--cyan); }
     .symbols i { width: 8px; height: 8px; flex: 0 0 auto; }
     .symbols .spec-logic i { background: var(--cyan); border-radius: 50%; }
     .symbols .spec-contract i { background: var(--violet-ink); transform: rotate(45deg); }
     .symbols .spec-text i { background: #C5D0E2; border-radius: 2px; }
-    .symbols span { display: grid; min-width: 0; }
-    .symbols strong { font-weight: 560; }
-    .symbols small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .symbol-copy { display: grid; flex: 1 1 auto; min-width: 0; }
+    .symbols strong { font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .symbols small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
     .tree { margin: 0; }
     .tree ul { list-style: none; margin: 0; padding: 0 0 0 12px; border-left: 1px solid var(--line); }
     .tree > ul { padding-left: 0; border-left: 0; }
     .tree li { margin: 0; }
     .tree summary { border: 0; background: transparent; padding: 4px 0; color: var(--cyan); font-size: 12px; }
     .tree summary:hover { border-color: transparent; }
-    .tree-file-name { display: block; margin: 8px 0 4px; font-family: "JetBrains Mono", ui-monospace, monospace; }
+    .tree-file-name { display: block; margin: 10px 0 4px; font-family: "JetBrains Mono", ui-monospace, monospace; }
     @media (max-width: 860px) {
       html, body { height: auto; }
       body { display: block; }
@@ -235,12 +256,12 @@ export function renderConstellation(graph: Graph): string {
       <div class="symbol-head">
         <h2>Changed symbols</h2>
         <div class="view-toggle" role="group" aria-label="Changed symbols view">
-          <button type="button" id="view-list" class="is-on" aria-pressed="true">List</button>
-          <button type="button" id="view-tree" aria-pressed="false">Tree</button>
+          <button type="button" id="view-tree" class="is-on" aria-pressed="true">Tree</button>
+          <button type="button" id="view-list" aria-pressed="false">List</button>
         </div>
       </div>
       <input id="symbol-filter" class="finder" type="search" placeholder="Filter symbols" aria-label="Filter symbols">
-      <div class="index symbols" id="symbol-list">${index || '<p class="quiet">No symbols in this map.</p>'}</div>
+      <div class="index symbols" id="symbol-list" hidden>${index || '<p class="quiet">No symbols in this map.</p>'}</div>
       ${tree}
       <p id="index-empty" class="quiet" hidden>No symbol matches.</p>
     </aside>
@@ -269,10 +290,22 @@ function symbolButton(entry: { node: GraphNode; index: number }, showPath: boole
   const { node, index } = entry
   const meta = showPath ? `<small>${escapeHtml(node.path)}:${node.line}</small>` : ''
   const search = escapeHtml(`${node.name} ${node.path}`)
-  return `<button type="button" class="spec-${node.spectral}" data-index="${index}" data-search="${search}"><i aria-hidden="true"></i><span><strong>${escapeHtml(node.name)}</strong>${meta}</span></button>`
+  return `<button type="button" class="spec-${node.spectral}" data-index="${index}" data-search="${search}"><i aria-hidden="true"></i><span class="symbol-copy"><strong>${escapeHtml(node.name)}</strong>${meta}</span>${symbolStats(node)}</button>`
+}
+
+function symbolStats(node: GraphNode): string {
+  const additions = node.additions ?? 0
+  const deletions = node.deletions ?? 0
+  const complexity = node.complexity ?? 0
+  const delta = node.complexityDelta ?? 0
+  const lines = additions === 0 && deletions === 0 ? '' : `<span class="add">+${additions}</span><span class="del">−${deletions}</span>`
+  const change = delta === 0 ? '' : ` <em>${signed(delta)}</em>`
+  const label = `${additions} added, ${deletions} deleted, complexity ${complexity}${delta === 0 ? '' : `, delta ${signed(delta)}`}`
+  return `<span class="symbol-meta" title="${escapeHtml(label)}">${lines}<span class="cx">complexity ${complexity}${change}</span></span>`
 }
 
 function symbolTree(entries: Array<{ node: GraphNode; index: number }>): string {
+  if (entries.length === 0) return '<div class="tree symbols" id="symbol-tree"><p class="quiet">No symbols in this map.</p></div>'
   const root = treeBranch()
   for (const entry of entries) {
     const parts = entry.node.path.split('/').filter(Boolean)
@@ -287,7 +320,7 @@ function symbolTree(entries: Array<{ node: GraphNode; index: number }>): string 
     list.push(entry)
     branch.files.set(file, list)
   }
-  return `<div class="tree symbols" id="symbol-tree" hidden>${renderTree(root)}</div>`
+  return `<div class="tree symbols" id="symbol-tree">${renderTree(root)}</div>`
 }
 
 function treeBranch(): { dirs: Map<string, ReturnType<typeof treeBranch>>; files: Map<string, Array<{ node: GraphNode; index: number }>> } {

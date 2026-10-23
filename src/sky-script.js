@@ -22,8 +22,13 @@
       role: node.role,
       units: node.units || [],
       prs: node.prs || [],
+      endLine: node.endLine || node.line,
       complexity: node.complexity || 0,
       complexityDelta: node.complexityDelta || 0,
+      additions: node.additions || 0,
+      deletions: node.deletions || 0,
+      oldLine: node.oldLine || 0,
+      oldEndLine: node.oldEndLine || 0,
       excerpt: node.excerpt || "",
       findings: [],
       x: 0,
@@ -621,16 +626,152 @@
     addText("h2", node.name);
     addText("p", node.path + ":" + node.line, "mono");
     if (node.signature) addText("p", node.signature);
-    addText("p", "Complexity " + node.complexity + " (" + signed(node.complexityDelta) + ")");
+    addText("p", node.complexityDelta ? "Complexity " + node.complexity + " (" + signed(node.complexityDelta) + ")" : "Complexity " + node.complexity);
     if (node.prs.length) addText("p", "PR " + node.prs.join(", "));
     node.findings.forEach(function (finding) {
       addText("p", finding.id + " " + finding.severity + " — " + finding.description, "alert");
     });
-    if (node.excerpt) {
-      var pre = document.createElement("pre");
-      pre.textContent = node.excerpt;
-      detail.appendChild(pre);
+    renderReview(node);
+  }
+
+  function fileFor(path) {
+    var found = null;
+    (data.files || []).forEach(function (file) {
+      if (file.path === path) found = file;
+    });
+    return found;
+  }
+
+  function renderReview(node) {
+    var file = fileFor(node.path);
+    var review = document.createElement("section");
+    review.className = "diff-review";
+    review.setAttribute("aria-label", "Review " + node.path);
+    var head = document.createElement("div");
+    head.className = "diff-head";
+    var title = document.createElement("strong");
+    title.textContent = node.path;
+    head.appendChild(title);
+    var stats = document.createElement("span");
+    stats.className = "symbol-meta";
+    var added = document.createElement("span");
+    added.className = "add";
+    added.textContent = "+" + (file ? file.additions || 0 : node.additions);
+    var removed = document.createElement("span");
+    removed.className = "del";
+    removed.textContent = "−" + (file ? file.deletions || 0 : node.deletions);
+    stats.appendChild(added);
+    stats.appendChild(removed);
+    head.appendChild(stats);
+    review.appendChild(head);
+    if (!file || file.binary || !file.patch) {
+      var empty = document.createElement("p");
+      empty.className = "diff-empty";
+      empty.textContent = file && file.binary ? "Binary file. There is no text diff to review." : "No line diff is stored for this file.";
+      review.appendChild(empty);
+      detail.appendChild(review);
+      if (node.excerpt) {
+        var pre = document.createElement("pre");
+        pre.textContent = node.excerpt;
+        detail.appendChild(pre);
+      }
+      return;
     }
+    if (file.partial) {
+      var note = document.createElement("p");
+      note.className = "diff-note";
+      note.textContent = "Remote diff. This review shows the changed lines only.";
+      review.appendChild(note);
+    }
+    var body = document.createElement("div");
+    body.className = "diff-body";
+    body.tabIndex = 0;
+    body.setAttribute("aria-label", "Line changes in " + node.path);
+    var table = document.createElement("table");
+    table.className = "diff-table";
+    parsePatch(file.patch).forEach(function (row) {
+      var tr = document.createElement("tr");
+      if (row.kind === "hunk") {
+        tr.className = "hunk";
+        var cell = document.createElement("td");
+        cell.colSpan = 4;
+        cell.textContent = row.text;
+        tr.appendChild(cell);
+        table.appendChild(tr);
+        return;
+      }
+      tr.className = row.kind + (marksSymbol(row, node) ? " is-mark" : "");
+      appendCell(tr, "ln", row.oldLine == null ? "" : String(row.oldLine));
+      appendCell(tr, "ln", row.newLine == null ? "" : String(row.newLine));
+      appendCell(tr, "sign", row.kind === "add" ? "+" : row.kind === "del" ? "-" : "");
+      appendCell(tr, "code", row.text);
+      table.appendChild(tr);
+    });
+    body.appendChild(table);
+    review.appendChild(body);
+    detail.appendChild(review);
+    var mark = table.querySelector(".is-mark");
+    if (!mark) return;
+    var top = mark.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+    body.scrollTop = Math.max(0, top - 48);
+  }
+
+  function appendCell(row, className, text) {
+    var cell = document.createElement("td");
+    cell.className = className;
+    cell.textContent = text;
+    row.appendChild(cell);
+  }
+
+  function marksSymbol(row, node) {
+    if (!node || node.kind === "file") return false;
+    var removed = String(node.signature || "").indexOf("removed ") === 0;
+    if (row.kind === "del") {
+      var start = removed ? node.line : node.oldLine;
+      var end = removed ? node.endLine : node.oldEndLine;
+      if (!start || !end || row.oldLine == null) return false;
+      return row.oldLine >= start && row.oldLine <= end;
+    }
+    if (removed || row.newLine == null) return false;
+    return row.newLine >= node.line && row.newLine <= (node.endLine || node.line);
+  }
+
+  function parsePatch(patch) {
+    var rows = [];
+    var oldLine = 0;
+    var newLine = 0;
+    var inHunk = false;
+    String(patch || "").split(/\r?\n/).forEach(function (line) {
+      var hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+      if (hunk) {
+        oldLine = Number(hunk[1]);
+        newLine = Number(hunk[2]);
+        inHunk = true;
+        rows.push({ kind: "hunk", text: line });
+        return;
+      }
+      if (!inHunk || line.charAt(0) === "\\") return;
+      if (line.indexOf("diff --git ") === 0 || line.indexOf("index ") === 0 || line.indexOf("--- ") === 0 || line.indexOf("+++ ") === 0 || line.indexOf("new file ") === 0 || line.indexOf("deleted file ") === 0 || line.indexOf("rename ") === 0 || line.indexOf("similarity ") === 0 || line.indexOf("old mode ") === 0 || line.indexOf("new mode ") === 0) {
+        inHunk = false;
+        return;
+      }
+      if (line.charAt(0) === "+") {
+        rows.push({ kind: "add", oldLine: null, newLine: newLine, text: line.slice(1) });
+        newLine += 1;
+        return;
+      }
+      if (line.charAt(0) === "-") {
+        rows.push({ kind: "del", oldLine: oldLine, newLine: null, text: line.slice(1) });
+        oldLine += 1;
+        return;
+      }
+      if (line.charAt(0) === " ") {
+        rows.push({ kind: "ctx", oldLine: oldLine, newLine: newLine, text: line.slice(1) });
+        oldLine += 1;
+        newLine += 1;
+      }
+    });
+    return rows;
   }
 
   function addText(tag, text, className) {
@@ -641,7 +782,9 @@
   }
 
   function signed(value) {
-    return value > 0 ? "+" + value : String(value);
+    if (value > 0) return "+" + value;
+    if (value < 0) return String(value);
+    return "+0";
   }
 
   function localPoint(event) {

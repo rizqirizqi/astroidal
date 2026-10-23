@@ -98,6 +98,7 @@ export interface GraphFile {
   deletions: number
   binary: boolean
   partial: boolean
+  patch: string
 }
 
 export interface GraphNode {
@@ -117,6 +118,10 @@ export interface GraphNode {
   prs: Array<number | string>
   calls: string[]
   excerpt: string
+  additions: number
+  deletions: number
+  oldLine?: number
+  oldEndLine?: number
 }
 
 export interface GraphEdge {
@@ -179,6 +184,10 @@ export interface BuiltSymbol extends SyntaxSymbol {
   path: string
   complexity: number
   complexityDelta: number
+  additions: number
+  deletions: number
+  oldLine?: number
+  oldEndLine?: number
   units: string[]
   prs: Array<number | string>
   spectral: Spectral
