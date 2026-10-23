@@ -12,6 +12,8 @@ description: >-
 
 Map the change, search it for real bugs, then rank the findings. The chart and the table live in files. The chat reply is a short prose summary.
 
+The bug catalog is [references/review-lenses.md](references/review-lenses.md), next to this file. Read it before judging a finding. It is not in `.astroidal/`.
+
 Do not add Astroidal as a dependency. Do not edit `package.json`, lockfiles, `pyproject.toml`, `go.mod`, or `Cargo.toml` to install it.
 
 ## Run it
@@ -68,13 +70,16 @@ Read, in order:
 4. `.astroidal/packets/performance.md`
 5. `.astroidal/packets/ux.md`
 6. `.astroidal/packets/correctness.md`
+7. `references/review-lenses.md` next to this skill
+
+Apply the gate, the spec pass, and the standards pass in the catalog. Then apply each language section that matches a file in Added lines. Skip the other language sections.
 
 Cover every changed path in the bug map. Start with the **Added lines** section. That section is the change, one block per pull request. A symbol excerpt can be blank when the diff was fetched remotely, and on a stack it is only the tip. A blank excerpt is missing context, not an empty change.
 
 Do not stop after the first likely file. For every non-test source block in Added lines:
 
 - Read the whole block, including the lines under it when the block says further lines are in the evidence file.
-- Check that block for all five classes below, not only the class that matches the filename.
+- Check that block against the catalog, not only the class that matches the filename. The five classes below are the minimum.
 - When one file lists more than one pull request, review each block. The mapped body is only the stack tip.
 - Open the file when the block is not enough to confirm or reject a bug.
 - For each changed symbol, inspect the one-hop callers and callees the map lists when the change could break them.
@@ -89,7 +94,7 @@ Search all of these classes:
 - Security bugs: authz gaps, injection, secrets, unsafe trust boundaries
 - UX flow bugs: dead ends, missing error, empty, or loading states, broken navigation
 
-Look for important issues. Do not nitpick. Leads in the packets are hints, not findings. Ignore formatting, naming, comments, theoretical risks, and refactors that do not name a concrete failure.
+Look for important issues. Leads in the packets are hints, not findings. A code smell, a long file, a missing test, or a dependency bump is a finding only when the catalog's gate passes. Ignore formatting, naming, comments, praise, questions, and refactors that do not name a concrete failure.
 
 ## Write findings
 
@@ -112,7 +117,9 @@ Write `.astroidal/findings.json`:
 }
 ```
 
-`severity` is `critical`, `high`, or `medium`. `quote` is one exact line copied from an added-lines block, the mapped file, or its one-hop neighbor. Set `pr` to the pull request that introduced that line, or omit it for a local change. An empty `findings` array is valid only after the added lines of every non-test source file have been checked and none of them contain an important bug.
+`severity` is `critical`, `high`, or `medium`, using the gate in the catalog. `critical` is a crash, data loss, authz bypass, injection, or secret exposure on a path users hit. `high` is a realistic wrong result, lost write, race, or broken contract. `medium` is a realistic edge that fails. `quote` is one exact line copied from an added-lines block, the mapped file, or its one-hop neighbor. Set `pr` to the pull request that introduced that line, or omit it for a local change.
+
+Say what breaks, name the symbol, and give the change that removes the bug. For security and architecture, say why that change holds. Do not hedge, restate the quoted line, or file a question. An empty `findings` array is valid only after the added lines of every non-test source file have been checked against the catalog and none of them contain an important bug.
 
 When changed files belong together for a reason the directory does not already show, name that group. The chart draws a directory on its own, and it draws an import as a line. A group is for a flow, a feature, or a shared contract that crosses those.
 

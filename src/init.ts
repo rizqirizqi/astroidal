@@ -1,12 +1,12 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { tryGit } from './git.js'
 
-const SKILL_PATHS = [
-  join('.agents', 'skills', 'astroidal', 'SKILL.md'),
-  join('.cursor', 'skills', 'astroidal', 'SKILL.md'),
+const SKILL_DIRS = [
+  join('.agents', 'skills', 'astroidal'),
+  join('.cursor', 'skills', 'astroidal'),
 ]
 
 export function packageRoot(): string {
@@ -19,19 +19,32 @@ export function packageRoot(): string {
 
 export function installSkill(start: string, force: boolean, global = false): string[] {
   const root = global ? homedir() : tryGit(start, ['rev-parse', '--show-toplevel'])?.trim() || start
-  const source = join(packageRoot(), 'skills', 'astroidal', 'SKILL.md')
+  const sourceDir = join(packageRoot(), 'skills', 'astroidal')
   const notes: string[] = []
-  for (const destination of SKILL_PATHS.map((path) => join(root, path))) {
-    if (existsSync(destination) && !force) {
-      notes.push(`Kept ${destination}`)
-      continue
+  for (const destinationDir of SKILL_DIRS.map((path) => join(root, path))) {
+    for (const source of filesUnder(sourceDir)) {
+      const destination = join(destinationDir, relative(sourceDir, source))
+      if (existsSync(destination) && !force) {
+        notes.push(`Kept ${destination}`)
+        continue
+      }
+      mkdirSync(dirname(destination), { recursive: true })
+      copyFileSync(source, destination)
+      notes.push(`Wrote ${destination}`)
     }
-    mkdirSync(dirname(destination), { recursive: true })
-    copyFileSync(source, destination)
-    notes.push(`Wrote ${destination}`)
   }
   if (!global && ensureGitignore(root)) notes.push('Added .astroidal/ to .gitignore.')
   return notes
+}
+
+function filesUnder(dir: string): string[] {
+  const found: string[] = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) found.push(...filesUnder(path))
+    else if (entry.isFile()) found.push(path)
+  }
+  return found
 }
 
 function ensureGitignore(root: string): boolean {

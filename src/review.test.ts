@@ -256,6 +256,7 @@ test('graph and rank review a worktree without adding a dependency', () => {
     assert.ok(graph.neighbors.some((neighbor) => neighbor.path === 'src/app.ts'))
     assert.equal(readFileSync(join(root, 'package.json'), 'utf8').includes('astroidal'), false)
     assert.ok(existsSync(join(root, '.cursor', 'skills', 'astroidal', 'SKILL.md')))
+    assert.match(readFileSync(join(root, '.cursor', 'skills', 'astroidal', 'references', 'review-lenses.md'), 'utf8'), /Review lenses/)
     assert.ok(readFileSync(join(root, '.gitignore'), 'utf8').includes('.astroidal/'))
     writeFileSync(join(root, '.astroidal', 'findings.json'), JSON.stringify({
       findings: [
@@ -316,6 +317,8 @@ test('init --global installs the skill under the home directory', () => {
     const agentsSkill = join(home, '.agents', 'skills', 'astroidal', 'SKILL.md')
     assert.match(readFileSync(cursorSkill, 'utf8'), /name: astroidal/)
     assert.match(readFileSync(agentsSkill, 'utf8'), /name: astroidal/)
+    assert.match(readFileSync(join(home, '.cursor', 'skills', 'astroidal', 'references', 'review-lenses.md'), 'utf8'), /Review lenses/)
+    assert.match(readFileSync(join(home, '.agents', 'skills', 'astroidal', 'references', 'review-lenses.md'), 'utf8'), /Review lenses/)
     assert.equal(existsSync(join(root, '.cursor', 'skills', 'astroidal', 'SKILL.md')), false)
     assert.equal(existsSync(join(root, '.agents', 'skills', 'astroidal', 'SKILL.md')), false)
     assert.equal(readFileSync(join(root, '.gitignore'), 'utf8').includes('.astroidal/'), false)
