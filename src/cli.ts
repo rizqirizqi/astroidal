@@ -6,7 +6,7 @@ import { buildMap, scoreReview } from './analyze.js'
 import { writeEvidence, readEvidence } from './evidence.js'
 import { CommandError, repoRoot } from './git.js'
 import { renderConstellation } from './html.js'
-import { installSkill, packageRoot } from './init.js'
+import { installSkill, packageRoot, refreshGlobalSkill } from './init.js'
 import { writePackets } from './packets.js'
 import { readRepoFile, resolveScope } from './scope.js'
 import { rankFindings, renderReview } from './rank.js'
@@ -38,8 +38,10 @@ rank
   --findings file     Defaults to .astroidal/findings.json
 
 init
-  --force             Replace an installed skill.
+  --force             Replace an installed skill, including local edits.
   --global            Install for every repository, under the home directory.
+
+graph and rank update an unmodified global skill when this package is newer.
 `
 
 export function main(argv: string[]): number {
@@ -68,7 +70,7 @@ export function main(argv: string[]): number {
     writeFileSync(join(directory, 'graph.json'), JSON.stringify(built.graph, null, 2))
     writePackets(directory, built)
     writeFileSync(join(directory, 'constellation.html'), renderConstellation(built.graph))
-    console.log(summarize(built.graph))
+    console.log([refreshGlobalSkill(), summarize(built.graph)].filter(Boolean).join('\n'))
     return 0
   }
   if (command === 'rank') {
@@ -99,7 +101,7 @@ export function main(argv: string[]): number {
     writeFileSync(join(directory, 'graph.json'), JSON.stringify(graph, null, 2))
     writeFileSync(join(directory, 'review.md'), renderReview(graph, ranked))
     writeFileSync(join(directory, 'constellation.html'), renderConstellation(graph))
-    console.log(`Kept ${ranked.findings.length} findings. Dropped ${ranked.dropped.length}.\nWrote .astroidal/review.md and updated .astroidal/constellation.html`)
+    console.log([refreshGlobalSkill(), `Kept ${ranked.findings.length} findings. Dropped ${ranked.dropped.length}.\nWrote .astroidal/review.md and updated .astroidal/constellation.html`].filter(Boolean).join('\n'))
     return 0
   }
   throw new CommandError(`Unknown command "${command}". Run astroidal --help.`)

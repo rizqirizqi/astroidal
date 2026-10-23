@@ -9,7 +9,7 @@ npx --yes astroidal init
 npx --yes astroidal graph
 ```
 
-`init` copies the agent skill, including its review catalog, into `.agents/skills/astroidal/` and `.cursor/skills/astroidal/`. `init --global` copies those same paths under the home directory, so the skill is available in every repository. It does not edit package manifests. `graph` writes:
+`init` copies the agent skill, including its review catalog, into `.agents/skills/astroidal/` and `.cursor/skills/astroidal/`. `init --global` copies those same paths under the home directory, so the skill is available in every repository. A later `graph` or `rank` refreshes that global copy when the package is newer and the files are still unmodified. An edited skill stays until `init --force`. It does not edit package manifests. `graph` writes:
 
 - `.astroidal/constellation.html` — constellation, four-cusp impact surface
 - `.astroidal/packets/bug-map.md` — changed symbols, one-hop neighbors, and search leads

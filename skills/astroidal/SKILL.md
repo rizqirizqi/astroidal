@@ -37,6 +37,8 @@ Pass `--global` to install it once for every repository on this machine:
 npx --yes astroidal init --global
 ```
 
+A global install updates when a newer Astroidal runs `graph` or `rank`, as long as those skill files are still the ones Astroidal wrote. An edited skill stays in place until `init --force`. Run `init` again to refresh a project install.
+
 ## Choose the scope
 
 Run `graph` once. Read the scope note it prints. If that scope is wrong, rerun once with the flag below. Do not rerun after that.

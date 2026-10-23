@@ -239,9 +239,12 @@ test('rank keeps a logical group and drops a path outside the map', () => {
 
 test('graph and rank review a worktree without adding a dependency', () => {
   const root = makeRepo()
+  const home = mkdtempSync(join(tmpdir(), 'astroidal-home-'))
   const previous = process.cwd()
+  const previousHome = process.env.HOME
   try {
     process.chdir(root)
+    process.env.HOME = home
     assert.equal(main(['init']), 0)
     assert.equal(main(['graph']), 0)
     const graph = JSON.parse(readFileSync(join(root, '.astroidal', 'graph.json'), 'utf8')) as Graph
@@ -299,7 +302,10 @@ test('graph and rank review a worktree without adding a dependency', () => {
     assert.match(bugMap, /src\/auth\.ts/)
   } finally {
     process.chdir(previous)
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
     rmSync(root, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
   }
 })
 
@@ -366,8 +372,11 @@ exit 0
   git(root, ['commit', '-m', 'feature'])
   const previousPath = process.env.PATH
   const previousLog = process.env.GH_LOG
+  const home = mkdtempSync(join(tmpdir(), 'astroidal-home-'))
+  const previousHome = process.env.HOME
   process.env.PATH = `${bin}${delimiter}${previousPath ?? ''}`
   process.env.GH_LOG = log
+  process.env.HOME = home
   const previous = process.cwd()
   try {
     process.chdir(root)
@@ -383,7 +392,89 @@ exit 0
     process.env.PATH = previousPath
     if (previousLog === undefined) delete process.env.GH_LOG
     else process.env.GH_LOG = previousLog
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
     rmSync(root, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('graph refreshes an unmodified global skill and leaves edits and project copies', () => {
+  const root = makeRepo()
+  const home = mkdtempSync(join(tmpdir(), 'astroidal-home-'))
+  const previous = process.cwd()
+  const previousHome = process.env.HOME
+  try {
+    process.chdir(root)
+    process.env.HOME = home
+    assert.equal(main(['init']), 0)
+    assert.equal(main(['init', '--global']), 0)
+    const projectSkill = join(root, '.cursor', 'skills', 'astroidal')
+    const globalSkill = join(home, '.cursor', 'skills', 'astroidal')
+    const agentsSkill = join(home, '.agents', 'skills', 'astroidal')
+    rewriteStamp(projectSkill, '0.0.1')
+    rewriteStamp(join(root, '.agents', 'skills', 'astroidal'), '0.0.1')
+    rewriteStamp(globalSkill, '0.0.1')
+    rewriteStamp(agentsSkill, '0.0.1')
+    const updated = captureLog(() => {
+      assert.equal(main(['graph']), 0)
+    })
+    assert.match(updated, /Updated Astroidal skill 0\.0\.1 → 0\.1\.0\./)
+    assert.equal(stampVersion(globalSkill), '0.1.0')
+    assert.equal(stampVersion(agentsSkill), '0.1.0')
+    assert.equal(stampVersion(projectSkill), '0.0.1')
+
+    writeFileSync(join(globalSkill, 'SKILL.md'), 'custom\n')
+    rewriteStamp(globalSkill, '0.0.1')
+    const edited = captureLog(() => {
+      assert.equal(main(['graph']), 0)
+    })
+    assert.match(edited, /Run astroidal init --force to replace it/)
+    assert.equal(readFileSync(join(globalSkill, 'SKILL.md'), 'utf8'), 'custom\n')
+    assert.equal(stampVersion(globalSkill), '0.0.1')
+
+    assert.equal(main(['init', '--global', '--force']), 0)
+    rmSync(join(globalSkill, '.install.json'))
+    rmSync(join(agentsSkill, '.install.json'))
+    const adopted = captureLog(() => {
+      assert.equal(main(['graph']), 0)
+    })
+    assert.doesNotMatch(adopted, /Updated Astroidal skill/)
+    assert.doesNotMatch(adopted, /init --force/)
+    assert.equal(stampVersion(globalSkill), '0.1.0')
+    assert.equal(stampVersion(agentsSkill), '0.1.0')
+
+    rewriteStamp(globalSkill, '9.0.0')
+    rewriteStamp(agentsSkill, '9.0.0')
+    const stayed = captureLog(() => {
+      assert.equal(main(['graph']), 0)
+    })
+    assert.doesNotMatch(stayed, /Updated Astroidal skill/)
+    assert.equal(stampVersion(globalSkill), '9.0.0')
+
+    rmSync(join(globalSkill, '.install.json'))
+    writeFileSync(join(globalSkill, 'SKILL.md'), 'legacy\n')
+    const legacy = captureLog(() => {
+      assert.equal(main(['graph']), 0)
+    })
+    assert.match(legacy, /init --force/)
+    assert.equal(readFileSync(join(globalSkill, 'SKILL.md'), 'utf8'), 'legacy\n')
+
+    rmSync(join(globalSkill, 'references', 'review-lenses.md'))
+    const repaired = captureLog(() => {
+      assert.equal(main(['init', '--global']), 0)
+    })
+    assert.match(repaired, /init --force/)
+    assert.equal(readFileSync(join(globalSkill, 'SKILL.md'), 'utf8'), 'legacy\n')
+    assert.match(readFileSync(join(globalSkill, 'references', 'review-lenses.md'), 'utf8'), /Review lenses/)
+    assert.equal(stampVersion(projectSkill), '0.0.1')
+    assert.equal(stampVersion(agentsSkill), '9.0.0')
+  } finally {
+    process.chdir(previous)
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
+    rmSync(root, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
   }
 })
 
@@ -406,4 +497,30 @@ function makeRepo(): string {
 
 function git(cwd: string, args: string[]): void {
   execFileSync('git', args, { cwd, encoding: 'utf8' })
+}
+
+function captureLog(run: () => void): string {
+  const lines: string[] = []
+  const previous = console.log
+  console.log = (message?: unknown) => {
+    lines.push(String(message ?? ''))
+  }
+  try {
+    run()
+  } finally {
+    console.log = previous
+  }
+  return lines.join('\n')
+}
+
+function rewriteStamp(dir: string, version: string): void {
+  const path = join(dir, '.install.json')
+  const stamp = JSON.parse(readFileSync(path, 'utf8')) as { version: string }
+  stamp.version = version
+  writeFileSync(path, `${JSON.stringify(stamp, null, 2)}\n`)
+}
+
+function stampVersion(dir: string): string {
+  const stamp = JSON.parse(readFileSync(join(dir, '.install.json'), 'utf8')) as { version: string }
+  return stamp.version
 }
