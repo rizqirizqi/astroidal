@@ -1,8 +1,6 @@
 # Astroidal
 
-The AI code review map, scorer, and helper. It draws the blast radius of the change in front of you, hands an agent a bug map that agent has to prove, and turns what survives into Astroidal Score: **Passed** or **Fix first**.
-
-Astroidal maps the syntax of a diff. The agent searches for bugs. Astroidal checks the quotes, drops duplicates, and ranks what remains. Nothing is added to the project. There is no review bot on the pull request. The picture is `.astroidal/constellation.html`: the change as a sky, four cusps of impact, and the Astroidal score.
+AI code review map, scorer, and helper. Astroidal draws the change. Your agent looks for bugs. Astroidal scores what survives: **Passed** or **Fix first**.
 
 ## How a review goes
 
@@ -16,20 +14,39 @@ flowchart LR
   class hunt agent
 ```
 
-Run it with `npx` on the branch you already have open.
+## Start
 
-```bash
+Copy setup prompt for your agent:
+
+```text
+Set up Astroidal and review this change. Do not add it as a dependency. Run:
+
 npx --yes astroidal init
 npx --yes astroidal graph
+
+Follow the installed Astroidal skill: search the bug map and write .astroidal/findings.json. Then run:
+
+npx --yes astroidal rank
+
+Reply with the score, Passed or Fix first, and the paths to .astroidal/review.md and .astroidal/constellation.html.
 ```
 
-`init` copies the agent skill, including its review catalog, into `.agents/skills/astroidal/` and `.cursor/skills/astroidal/`. `init --global` copies those same paths under the home directory, so the skill is available in every repository. A later `graph` or `rank` refreshes that global copy when the package is newer and the files are still unmodified. An edited skill stays until `init --force`. It does not edit package manifests. `graph` writes:
+`init` installs the skill into `.agents/skills/astroidal/` and `.cursor/skills/astroidal/`, and ignores `.astroidal/`. `init --global` installs it for every repository. `init --force` replaces a skill you edited. A newer Astroidal refreshes an unmodified global skill on `graph` or `rank`.
 
-- `.astroidal/constellation.html` — constellation, four-cusp impact surface
-- `.astroidal/packets/bug-map.md` — changed symbols, one-hop neighbors, and search leads
-- `.astroidal/graph.json` — the same map for tools
+## Output
 
-A clean feature branch is mapped against the default base. A dirty worktree maps uncommitted changes, including untracked files. Pass a scope when you want something else:
+| File | What it is |
+| --- | --- |
+| `.astroidal/constellation.html` | The map and the score |
+| `.astroidal/packets/bug-map.md` | What the agent searches |
+| `.astroidal/review.md` | Ranked findings, after `rank` |
+| `.astroidal/graph.json` | The same map for tools |
+
+Rank keeps critical, high, and medium findings that quote a real line in the change or a direct neighbor. Those findings show on the map.
+
+## Scope
+
+A dirty worktree maps uncommitted changes, including untracked files. A clean branch maps that branch against its default base.
 
 ```bash
 npx --yes astroidal graph --pr 12,18,24
@@ -39,16 +56,8 @@ npx --yes astroidal graph --commit HEAD
 npx --yes astroidal graph --staged
 ```
 
-Local branches are read with git. `gh` is used for open-pull-request lists and for diffs whose branches are not available locally. Astroidal does not comment or approve.
+Local branches are read with git. `gh` lists open pull requests and fetches a diff whose branch is not local. `astroidal --help` covers the rest, including `--author`, `--base`, `--unstaged`, and `--repo`.
 
-After the review, write `.astroidal/findings.json` and rank it:
+## License
 
-```bash
-npx --yes astroidal rank
-```
-
-Rank keeps critical, high, and medium findings that quote a real line in the mapped change or its one-hop neighbors. The merged table is `.astroidal/review.md`. Columns are ID, Severity, Issue Description, File Path, Recommendation, and PR. The same findings light up on the constellation.
-
-Node 20 or newer is required on the machine running the command. The repository under review can be any language.
-
-MIT licensed.
+MIT.
