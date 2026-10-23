@@ -1,7 +1,7 @@
 ---
 name: astroidal
 description: >-
-  Reviews code for important bugs and design risks with Astroidal's syntax map.
+  Reviews code with Astroidal, the AI code review map, scorer, and helper.
   Use when the user asks for a code review, pull request review, bug hunt,
   security review, architecture review, UX-flow review, or to run Astroidal.
   Works on one change, a commit, staged or unstaged edits, and a batch of
@@ -10,7 +10,7 @@ description: >-
 
 # Astroidal
 
-Map the change, search it for real bugs, then rank the findings. The chart and the table live in files. The chat reply is a short prose summary.
+Astroidal is the AI code review map, scorer, and helper. It draws the blast radius and scores what you can prove. Map the change, search it for real bugs, then rank the findings. The chart and the table live in files. The chat reply is a short prose summary a person can paste.
 
 The bug catalog is [references/review-lenses.md](references/review-lenses.md), next to this file. Read it before judging a finding. It is not in `.astroidal/`.
 
@@ -146,4 +146,4 @@ If rank drops a finding because the quote or path is wrong, fix that finding onc
 
 ## Reply
 
-Write a short prose summary in chat. Name the Astroidal score, whether it says Fix first or Passed, the highest-severity issues, and the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart. The human still decides whether to merge.
+Write a short prose summary in chat. Open with a line the person can paste: `Astroidal {score} · Passed` or `Astroidal {score} · Fix first`. Then name the highest-severity issues and the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart. The human still decides whether to merge.

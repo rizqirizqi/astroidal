@@ -23,13 +23,22 @@ export function renderConstellation(graph: Graph): string {
   const batchCount = graph.units.length
   const batchLabel = batchCount > 1 ? `${batchCount} pull requests` : escapeHtml(graph.units.map((unit) => unit.label).join(', ') || 'local changes')
   const impact = graph.impact
+  const review = reviewOf(graph)
+  const verdictLabel = review.verdict === 'passed' ? 'Passed' : 'Fix first'
+  const shareLine = `Astroidal ${review.value} · ${verdictLabel} on ${graph.repoName}. The AI code review map — blast radius, bug map, and a score. npx --yes astroidal graph`
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Astroidal · ${escapeHtml(graph.repoName)}</title>
+  <title>Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictLabel}</title>
+  <meta name="description" content="${escapeHtml(shareLine)}">
+  <meta property="og:title" content="Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictLabel}">
+  <meta property="og:description" content="${escapeHtml(shareLine)}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictLabel}">
+  <meta name="twitter:description" content="${escapeHtml(shareLine)}">
   <style>
     :root {
       color-scheme: dark;
@@ -67,7 +76,9 @@ export function renderConstellation(graph: Graph): string {
     .eyebrow, .mono, small, .hint, .compass b, .tier { font-family: "JetBrains Mono", ui-monospace, monospace; }
     .eyebrow { margin: 0; color: var(--cyan); letter-spacing: 0.18em; text-transform: uppercase; font-size: 11px; }
     .brand h1 { margin: 0; font-size: 28px; line-height: 1; letter-spacing: -0.045em; }
-    .tagline { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .tagline { margin: 4px 0 0; color: var(--muted); font-size: 14px; max-width: 42ch; }
+    .roles { margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    .roles span { border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--violet-ink); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
     .meta { display: grid; justify-items: end; gap: 4px; }
     .tier { margin: 0; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
     .tier-full { border-color: rgba(255, 176, 32, 0.7); color: var(--amber); }
@@ -211,9 +222,10 @@ export function renderConstellation(graph: Graph): string {
     <div class="brand">
       <svg class="mark" width="42" height="42" viewBox="0 0 36 36" aria-hidden="true">${astroidMarkup(18, 18, 14, 1.4)}</svg>
       <div>
-        <p class="eyebrow">Map the change</p>
+        <p class="eyebrow">AI code review map</p>
         <h1>Astroidal</h1>
-        <p class="tagline">Review the logic.</p>
+        <p class="tagline">Map the blast radius. Score the change. Hand your agent a bug map.</p>
+        <p class="roles"><span>Helper</span><span>Map</span><span>Scorer</span></p>
       </div>
     </div>
     <div class="meta">
@@ -240,7 +252,7 @@ export function renderConstellation(graph: Graph): string {
       </div>
     </section>
     <aside aria-label="Lens">
-      ${scoreCard(reviewOf(graph))}
+      ${scoreCard(review)}
       <h2>Impact surface</h2>
       ${impactSurface(impact)}
       <ul class="legend">

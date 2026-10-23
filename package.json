@@ -1,7 +1,7 @@
 {
   "name": "astroidal",
   "version": "0.1.0",
-  "description": "Syntax-level code review maps for AI agents. Run with npx, without adding a project dependency.",
+  "description": "AI code review map, scorer, and helper. Draws the blast radius, hands an agent a bug map, and scores what survives. Run with npx, without adding a dependency.",
   "type": "module",
   "bin": {
     "astroidal": "./dist/cli.js"
@@ -15,10 +15,15 @@
     "node": ">=20"
   },
   "keywords": [
+    "ai",
+    "ai-code-review",
     "code-review",
+    "code-review-tool",
+    "bug-map",
     "ast",
     "cli",
-    "pull-request"
+    "pull-request",
+    "static-analysis"
   ],
   "license": "MIT",
   "author": "Mgs. M. Rizqi Fadhlurrahman <rizqirizqi23@gmail.com>",

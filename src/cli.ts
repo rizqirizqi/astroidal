@@ -12,7 +12,9 @@ import { readRepoFile, resolveScope } from './scope.js'
 import { rankFindings, renderReview } from './rank.js'
 import type { Graph, GraphOptions } from './types.js'
 
-const HELP = `Astroidal maps a change for review. It does not add itself as a dependency.
+const HELP = `Astroidal is the AI code review map, scorer, and helper.
+It draws the blast radius, hands an agent a bug map, and scores what survives.
+It does not add itself as a dependency.
 
   npx --yes astroidal init
   npx --yes astroidal graph
@@ -58,7 +60,7 @@ export function main(argv: string[]): number {
   const start = (parsed.flags.get('repo') ?? [])[0] ?? process.cwd()
   if (command === 'init') {
     const notes = installSkill(start, enabled(parsed.flags, 'force'), enabled(parsed.flags, 'global'))
-    console.log(['Astroidal skill installed.', 'No dependency was added.', ...notes, 'Run a review with: npx --yes astroidal graph'].join('\n'))
+    console.log(['Astroidal skill installed. The AI code review map is ready.', 'No dependency was added.', ...notes, 'Map a change with: npx --yes astroidal graph', 'Then open .astroidal/constellation.html and share the score.'].join('\n'))
     return 0
   }
   if (command === 'graph') {
@@ -101,7 +103,8 @@ export function main(argv: string[]): number {
     writeFileSync(join(directory, 'graph.json'), JSON.stringify(graph, null, 2))
     writeFileSync(join(directory, 'review.md'), renderReview(graph, ranked))
     writeFileSync(join(directory, 'constellation.html'), renderConstellation(graph))
-    console.log([refreshGlobalSkill(), `Kept ${ranked.findings.length} findings. Dropped ${ranked.dropped.length}.\nWrote .astroidal/review.md and updated .astroidal/constellation.html`].filter(Boolean).join('\n'))
+    const verdict = graph.score.verdict === 'passed' ? 'Passed' : 'Fix first'
+    console.log([refreshGlobalSkill(), `Kept ${ranked.findings.length} findings. Dropped ${ranked.dropped.length}.\nWrote .astroidal/review.md and updated .astroidal/constellation.html\nShare: Astroidal ${graph.score.value} · ${verdict} on ${graph.repoName}. The AI code review map. npx --yes astroidal graph`].filter(Boolean).join('\n'))
     return 0
   }
   throw new CommandError(`Unknown command "${command}". Run astroidal --help.`)
@@ -124,6 +127,7 @@ function summarize(graph: Graph): string {
     `Mapped ${graph.units.map((unit) => unit.label).join(', ') || 'nothing'}: ${graph.summary.files} files, ${graph.summary.symbols} symbols, ${graph.summary.neighbors} neighbors.`,
     `Impact: blast ${impact.blastRadius} (${impact.blastFiles} files), complexity ${impact.complexityRaw >= 0 ? '+' : ''}${impact.complexityRaw}, security ${impact.securityExposure}, performance ${impact.performanceImpact}.`,
     `Score ${graph.score.value}: ${graph.score.verdict === 'passed' ? 'Passed' : 'Fix first'}. ${graph.score.reason}`,
+    `Share: Astroidal ${graph.score.value} · ${graph.score.verdict === 'passed' ? 'Passed' : 'Fix first'} on ${graph.repoName}. The AI code review map. npx --yes astroidal graph`,
     ...graph.notes,
     graph.commands.length > 0 ? `Commands: ${graph.commands.join(' | ')}` : '',
     'Wrote .astroidal/constellation.html and .astroidal/packets/bug-map.md',

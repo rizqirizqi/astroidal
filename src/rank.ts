@@ -139,6 +139,8 @@ export function renderReview(graph: Graph, result: RankResult): string {
   const lines = [
     '# Astroidal review',
     '',
+    'The AI code review map for this change: blast radius, verified findings, and one score.',
+    '',
     `Scope: ${scope}`,
     '',
     ...(graph.score ? [`Score: ${graph.score.value} · ${graph.score.verdict === 'passed' ? 'Passed' : 'Fix first'}. ${graph.score.reason}`, ''] : []),

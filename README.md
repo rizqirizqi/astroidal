@@ -1,8 +1,22 @@
 # Astroidal
 
-Structural code review for the change in front of you. Astroidal maps the syntax of a diff, draws the blast radius, and gives an AI agent a bug map it can verify. The agent searches for bugs. Astroidal checks the quotes, drops duplicates, and ranks what remains.
+The AI code review map, scorer, and helper. It draws the blast radius of the change in front of you, hands an agent a bug map that agent has to prove, and turns what survives into Astroidal Score: **Passed** or **Fix first**.
 
-Run it with `npx`.
+Astroidal maps the syntax of a diff. The agent searches for bugs. Astroidal checks the quotes, drops duplicates, and ranks what remains. Nothing is added to the project. There is no review bot on the pull request. The picture is `.astroidal/constellation.html`: the change as a sky, four cusps of impact, and the Astroidal score.
+
+## How a review goes
+
+```mermaid
+flowchart LR
+  map["Astroidal maps the change"] --> hunt["Your agent looks for bugs"]
+  hunt --> score["Astroidal scores the review"]
+  classDef tool fill:#0C111C,stroke:#00F2FE,color:#E8EEF8
+  classDef agent fill:#0C111C,stroke:#D2B4FF,color:#E8EEF8
+  class map,score tool
+  class hunt agent
+```
+
+Run it with `npx` on the branch you already have open.
 
 ```bash
 npx --yes astroidal init
