@@ -66,6 +66,7 @@ export function main(argv: string[]): number {
   if (command === 'graph') {
     const scope = resolveScope(start, graphOptions(parsed.flags))
     const built = buildMap(scope)
+    assertMappable(built.graph)
     const directory = join(scope.root, '.astroidal')
     mkdirSync(directory, { recursive: true })
     writeEvidence(scope.root, built.files)
@@ -84,6 +85,7 @@ export function main(argv: string[]): number {
       throw new CommandError(`Write findings to ${findingsPath} before rank.\nEach finding needs severity, description, path, quote, and recommendation.`)
     }
     const graph = JSON.parse(readFileSync(graphPath, 'utf8')) as Graph
+    assertMappable(graph)
     const input = JSON.parse(readFileSync(findingsPath, 'utf8')) as unknown
     const ranked = rankFindings(graph, input, (path) => corpus(root, graph, path))
     graph.findings = ranked.findings
@@ -119,6 +121,12 @@ function corpus(root: string, graph: Graph, path: string): string | null {
     if (saved != null) return saved
   }
   return readRepoFile(root, path)
+}
+
+function assertMappable(graph: Graph): void {
+  if (graph.summary.files > 0) return
+  const detail = graph.notes.filter(Boolean).join('\n')
+  throw new CommandError(['No changes to map. An empty diff does not get a score.', detail].filter(Boolean).join('\n'))
 }
 
 function summarize(graph: Graph): string {

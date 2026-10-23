@@ -92,6 +92,25 @@ test('exposure score stays inside 0 to 100', () => {
   assert.ok(exposureScore(3, 8) < 50)
 })
 
+test('an empty branch is not scored', () => {
+  const root = mkdtempSync(join(tmpdir(), 'astroidal-empty-'))
+  const previous = process.cwd()
+  try {
+    git(root, ['init', '-b', 'main'])
+    git(root, ['config', 'user.email', 'astroidal@example.com'])
+    git(root, ['config', 'user.name', 'Astroidal'])
+    writeFileSync(join(root, 'readme.txt'), 'hello\n')
+    git(root, ['add', '.'])
+    git(root, ['commit', '-m', 'init'])
+    process.chdir(root)
+    assert.throws(() => main(['graph']), /An empty diff does not get a score/)
+    assert.equal(existsSync(join(root, '.astroidal', 'constellation.html')), false)
+  } finally {
+    process.chdir(previous)
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('the review score reaches 100 for a one-line change and falls off as the change grows', () => {
   const calm = { blastRadius: 0, complexityDelta: 0, securityExposure: 0, performanceImpact: 0, blastFiles: 0, complexityRaw: 0, securityLeads: 0, performanceLeads: 0 }
   const typo = scoreReview({ impact: calm, findings: [], reviewed: true, partial: false, additions: 1, deletions: 0, files: 1, symbols: 0 })
