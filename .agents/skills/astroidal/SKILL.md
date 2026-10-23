@@ -43,18 +43,18 @@ A global install updates when a newer Astroidal runs `graph` or `rank`, as long 
 
 Run `graph` once. Read the scope note it prints. If that scope is wrong, rerun once with the flag below. Do not rerun after that.
 
-| Ask | Command |
-| --- | --- |
-| Current edits, including untracked files | `npx --yes astroidal graph` |
-| This branch or its pull request, when the worktree is dirty | `npx --yes astroidal graph --base <default-branch>` |
-| A clean feature branch | `npx --yes astroidal graph` |
-| Pull request numbers or URLs | `npx --yes astroidal graph --pr 12,18,24` |
-| All open pull requests | `npx --yes astroidal graph --open` |
-| Open pull requests by author, label, or base | `npx --yes astroidal graph --open --author NAME --label NAME --base BRANCH` |
-| The current pull request and the stack under it | `npx --yes astroidal graph --stack` |
-| One commit | `npx --yes astroidal graph --commit SHA` |
-| Staged changes only | `npx --yes astroidal graph --staged` |
-| Unstaged changes and untracked files | `npx --yes astroidal graph --unstaged` |
+| Ask                                                         | Command                                                                     |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Current edits, including untracked files                    | `npx --yes astroidal graph`                                                 |
+| This branch or its pull request, when the worktree is dirty | `npx --yes astroidal graph --base <default-branch>`                         |
+| A clean feature branch                                      | `npx --yes astroidal graph`                                                 |
+| Pull request numbers or URLs                                | `npx --yes astroidal graph --pr 12,18,24`                                   |
+| All open pull requests                                      | `npx --yes astroidal graph --open`                                          |
+| Open pull requests by author, label, or base                | `npx --yes astroidal graph --open --author NAME --label NAME --base BRANCH` |
+| The current pull request and the stack under it             | `npx --yes astroidal graph --stack`                                         |
+| One commit                                                  | `npx --yes astroidal graph --commit SHA`                                    |
+| Staged changes only                                         | `npx --yes astroidal graph --staged`                                        |
+| Unstaged changes and untracked files                        | `npx --yes astroidal graph --unstaged`                                      |
 
 A batch is one merged map. Do not review the pull requests as separate reports.
 
@@ -129,7 +129,10 @@ When changed files belong together for a reason the directory does not already s
 {
   "findings": [],
   "groups": [
-    { "name": "Payment links", "paths": ["apps/admin/lib/whatsapp.ts", "apps/admin/lib/proxied-link.ts"] }
+    {
+      "name": "Payment links",
+      "paths": ["apps/admin/lib/whatsapp.ts", "apps/admin/lib/proxied-link.ts"]
+    }
   ]
 }
 ```

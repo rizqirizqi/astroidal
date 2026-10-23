@@ -1,0 +1,19 @@
+# Ignore artifacts:
+build
+coverage
+dist
+node_modules
+.webstorio
+.astroidal
+.env
+*.log
+.tmp
+.cache
+# Ignore editor/project files
+.vscode
+.idea
+.DS_Store
+# Ignore package manager artifacts
+package-lock.json
+# Site media
+apps/site/assets

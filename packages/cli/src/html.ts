@@ -1,31 +1,43 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { scoreReview } from './analyze.js'
-import type { Graph, GraphNode, ReviewScore } from './types.js'
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { scoreReview } from "./analyze.js";
+import type { Graph, GraphNode, ReviewScore } from "./types.js";
 
 export function renderConstellation(graph: Graph): string {
-  const payload = JSON.stringify(graph).replaceAll('<', '\\u003c')
-  const script = loadSky()
-  const units = graph.units.map((unit) => `<button type="button" data-filter="${escapeHtml(unit.id)}" aria-pressed="false">${escapeHtml(unit.label)}</button>`).join('')
+  const payload = JSON.stringify(graph).replaceAll("<", "\\u003c");
+  const script = loadSky();
+  const units = graph.units
+    .map(
+      (unit) =>
+        `<button type="button" data-filter="${escapeHtml(unit.id)}" aria-pressed="false">${escapeHtml(unit.label)}</button>`,
+    )
+    .join("");
   const changed = graph.nodes
     .map((node, index) => ({ node, index }))
-    .filter((entry) => entry.node.role === 'changed')
-    .slice(0, 80)
-  const index = changed.map((entry) => symbolButton(entry, false)).join('')
-  const tree = symbolTree(changed)
-  const alerts = graph.findings.length === 0
-    ? '<p class="quiet">No cusp alerts on this map.</p>'
-    : `<ol class="alerts">${graph.findings.map((finding) => `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em> ${escapeHtml(finding.description)}<button type="button" class="alert-path" data-alert-path="${escapeHtml(finding.path)}" data-alert-line="${finding.line ?? ''}" aria-label="Open ${escapeHtml(finding.path)} in the lens">${escapeHtml(finding.path)}${finding.line == null ? '' : `:${finding.line}`}</button></li>`).join('')}</ol>`
-  const unitScores = graph.impact.byUnit.length > 1
-    ? `<details class="unit-fold"><summary>${graph.impact.byUnit.length} pull requests</summary><ul class="units">${graph.impact.byUnit.map((unit) => `<li><span>${escapeHtml(unit.label)}</span><em>blast ${unit.blastRadius} · complexity ${signed(unit.complexityRaw)} · security ${unit.securityExposure} · perf ${unit.performanceImpact}</em></li>`).join('')}</ul></details>`
-    : ''
-  const batchCount = graph.units.length
-  const batchLabel = batchCount > 1 ? `${batchCount} pull requests` : escapeHtml(graph.units.map((unit) => unit.label).join(', ') || 'local changes')
-  const impact = graph.impact
-  const review = reviewOf(graph)
-  const verdictLabel = review.verdict === 'passed' ? 'Passed' : 'Fix first'
-  const shareLine = `Astroidal ${review.value} · ${verdictLabel} on ${graph.repoName}. The AI code review map — blast radius, bug map, and a score. npx --yes astroidal graph`
+    .filter((entry) => entry.node.role === "changed")
+    .slice(0, 80);
+  const index = changed.map((entry) => symbolButton(entry, false)).join("");
+  const tree = symbolTree(changed);
+  const alerts =
+    graph.findings.length === 0
+      ? '<p class="quiet">No cusp alerts on this map.</p>'
+      : `<ol class="alerts">${graph.findings.map((finding) => `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em> ${escapeHtml(finding.description)}<button type="button" class="alert-path" data-alert-path="${escapeHtml(finding.path)}" data-alert-line="${finding.line ?? ""}" aria-label="Open ${escapeHtml(finding.path)} in the lens">${escapeHtml(finding.path)}${finding.line == null ? "" : `:${finding.line}`}</button></li>`).join("")}</ol>`;
+  const unitScores =
+    graph.impact.byUnit.length > 1
+      ? `<details class="unit-fold"><summary>${graph.impact.byUnit.length} pull requests</summary><ul class="units">${graph.impact.byUnit.map((unit) => `<li><span>${escapeHtml(unit.label)}</span><em>blast ${unit.blastRadius} · complexity ${signed(unit.complexityRaw)} · security ${unit.securityExposure} · perf ${unit.performanceImpact}</em></li>`).join("")}</ul></details>`
+      : "";
+  const batchCount = graph.units.length;
+  const batchLabel =
+    batchCount > 1
+      ? `${batchCount} pull requests`
+      : escapeHtml(
+          graph.units.map((unit) => unit.label).join(", ") || "local changes",
+        );
+  const impact = graph.impact;
+  const review = reviewOf(graph);
+  const verdictLabel = review.verdict === "passed" ? "Passed" : "Fix first";
+  const shareLine = `Astroidal ${review.value} · ${verdictLabel} on ${graph.repoName}. The AI code review map — blast radius, bug map, and a score. npx --yes astroidal graph`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -256,9 +268,9 @@ export function renderConstellation(graph: Graph): string {
       <h2>Impact surface</h2>
       ${impactSurface(impact)}
       <ul class="legend">
-        <li><i class="shape logic" aria-hidden="true"></i> Logic <b>${countSpectral(graph.nodes, 'logic')}</b></li>
-        <li><i class="shape contract" aria-hidden="true"></i> Contract <b>${countSpectral(graph.nodes, 'contract')}</b></li>
-        <li><i class="shape text" aria-hidden="true"></i> Text <b>${countSpectral(graph.nodes, 'text')}</b></li>
+        <li><i class="shape logic" aria-hidden="true"></i> Logic <b>${countSpectral(graph.nodes, "logic")}</b></li>
+        <li><i class="shape contract" aria-hidden="true"></i> Contract <b>${countSpectral(graph.nodes, "contract")}</b></li>
+        <li><i class="shape text" aria-hidden="true"></i> Text <b>${countSpectral(graph.nodes, "text")}</b></li>
         <li><i class="shape orbit" aria-hidden="true"></i> Orbit</li>
       </ul>
       ${unitScores}
@@ -281,11 +293,11 @@ export function renderConstellation(graph: Graph): string {
   <script type="application/json" id="astroidal-data">${payload}</script>
   <script>${script}</script>
 </body>
-</html>`
+</html>`;
 }
 
 function reviewOf(graph: Graph): ReviewScore {
-  if (graph.score) return graph.score
+  if (graph.score) return graph.score;
   return scoreReview({
     impact: graph.impact,
     findings: graph.findings ?? [],
@@ -295,82 +307,117 @@ function reviewOf(graph: Graph): ReviewScore {
     deletions: graph.summary.deletions,
     files: graph.summary.files,
     symbols: graph.summary.symbols,
-  })
+  });
 }
 
-function symbolButton(entry: { node: GraphNode; index: number }, showPath: boolean): string {
-  const { node, index } = entry
-  const meta = showPath ? `<small>${escapeHtml(node.path)}:${node.line}</small>` : ''
-  const search = escapeHtml(`${node.name} ${node.path}`)
-  return `<button type="button" class="spec-${node.spectral}" data-index="${index}" data-search="${search}"><i aria-hidden="true"></i><span class="symbol-copy"><strong>${escapeHtml(node.name)}</strong>${meta}</span>${symbolStats(node)}</button>`
+function symbolButton(
+  entry: { node: GraphNode; index: number },
+  showPath: boolean,
+): string {
+  const { node, index } = entry;
+  const meta = showPath
+    ? `<small>${escapeHtml(node.path)}:${node.line}</small>`
+    : "";
+  const search = escapeHtml(`${node.name} ${node.path}`);
+  return `<button type="button" class="spec-${node.spectral}" data-index="${index}" data-search="${search}"><i aria-hidden="true"></i><span class="symbol-copy"><strong>${escapeHtml(node.name)}</strong>${meta}</span>${symbolStats(node)}</button>`;
 }
 
 function symbolStats(node: GraphNode): string {
-  const additions = node.additions ?? 0
-  const deletions = node.deletions ?? 0
-  const complexity = node.complexity ?? 0
-  const delta = node.complexityDelta ?? 0
-  const lines = additions === 0 && deletions === 0 ? '' : `<span class="add">+${additions}</span><span class="del">−${deletions}</span>`
-  const change = delta === 0 ? '' : ` <em>${signed(delta)}</em>`
-  const label = `${additions} added, ${deletions} deleted, complexity ${complexity}${delta === 0 ? '' : `, delta ${signed(delta)}`}`
-  return `<span class="symbol-meta" title="${escapeHtml(label)}">${lines}<span class="cx">complexity ${complexity}${change}</span></span>`
+  const additions = node.additions ?? 0;
+  const deletions = node.deletions ?? 0;
+  const complexity = node.complexity ?? 0;
+  const delta = node.complexityDelta ?? 0;
+  const lines =
+    additions === 0 && deletions === 0
+      ? ""
+      : `<span class="add">+${additions}</span><span class="del">−${deletions}</span>`;
+  const change = delta === 0 ? "" : ` <em>${signed(delta)}</em>`;
+  const label = `${additions} added, ${deletions} deleted, complexity ${complexity}${delta === 0 ? "" : `, delta ${signed(delta)}`}`;
+  return `<span class="symbol-meta" title="${escapeHtml(label)}">${lines}<span class="cx">complexity ${complexity}${change}</span></span>`;
 }
 
-function symbolTree(entries: Array<{ node: GraphNode; index: number }>): string {
-  if (entries.length === 0) return '<div class="tree symbols" id="symbol-tree"><p class="quiet">No symbols in this map.</p></div>'
-  const root = treeBranch()
+function symbolTree(
+  entries: Array<{ node: GraphNode; index: number }>,
+): string {
+  if (entries.length === 0)
+    return '<div class="tree symbols" id="symbol-tree"><p class="quiet">No symbols in this map.</p></div>';
+  const root = treeBranch();
   for (const entry of entries) {
-    const parts = entry.node.path.split('/').filter(Boolean)
-    const file = parts.pop() ?? entry.node.path
-    let branch = root
+    const parts = entry.node.path.split("/").filter(Boolean);
+    const file = parts.pop() ?? entry.node.path;
+    let branch = root;
     for (const part of parts) {
-      const next = branch.dirs.get(part) ?? treeBranch()
-      branch.dirs.set(part, next)
-      branch = next
+      const next = branch.dirs.get(part) ?? treeBranch();
+      branch.dirs.set(part, next);
+      branch = next;
     }
-    const list = branch.files.get(file) ?? []
-    list.push(entry)
-    branch.files.set(file, list)
+    const list = branch.files.get(file) ?? [];
+    list.push(entry);
+    branch.files.set(file, list);
   }
-  return `<div class="tree symbols" id="symbol-tree">${renderTree(root)}</div>`
+  return `<div class="tree symbols" id="symbol-tree">${renderTree(root)}</div>`;
 }
 
-function treeBranch(): { dirs: Map<string, ReturnType<typeof treeBranch>>; files: Map<string, Array<{ node: GraphNode; index: number }>> } {
-  return { dirs: new Map(), files: new Map() }
+function treeBranch(): {
+  dirs: Map<string, ReturnType<typeof treeBranch>>;
+  files: Map<string, Array<{ node: GraphNode; index: number }>>;
+} {
+  return { dirs: new Map(), files: new Map() };
 }
 
-function renderTree(branch: { dirs: Map<string, ReturnType<typeof treeBranch>>; files: Map<string, Array<{ node: GraphNode; index: number }>> }): string {
-  const dirs = [...branch.dirs.entries()].sort(([left], [right]) => left.localeCompare(right))
-  const files = [...branch.files.entries()].sort(([left], [right]) => left.localeCompare(right))
+function renderTree(branch: {
+  dirs: Map<string, ReturnType<typeof treeBranch>>;
+  files: Map<string, Array<{ node: GraphNode; index: number }>>;
+}): string {
+  const dirs = [...branch.dirs.entries()].sort(([left], [right]) =>
+    left.localeCompare(right),
+  );
+  const files = [...branch.files.entries()].sort(([left], [right]) =>
+    left.localeCompare(right),
+  );
   const items = [
-    ...dirs.map(([name, child]) => `<li><details open><summary>${escapeHtml(name)}</summary>${renderTree(child)}</details></li>`),
-    ...files.map(([name, group]) => `<li class="tree-file"><span class="tree-file-name">${escapeHtml(name)}</span>${group.map((entry) => symbolButton(entry, false)).join('')}</li>`),
-  ]
-  return `<ul>${items.join('')}</ul>`
+    ...dirs.map(
+      ([name, child]) =>
+        `<li><details open><summary>${escapeHtml(name)}</summary>${renderTree(child)}</details></li>`,
+    ),
+    ...files.map(
+      ([name, group]) =>
+        `<li class="tree-file"><span class="tree-file-name">${escapeHtml(name)}</span>${group.map((entry) => symbolButton(entry, false)).join("")}</li>`,
+    ),
+  ];
+  return `<ul>${items.join("")}</ul>`;
 }
 
 function scoreCard(score: ReviewScore): string {
-  const label = score.verdict === 'passed' ? 'Passed' : 'Fix first'
-  return `<section class="verdict verdict-${score.verdict}" aria-label="Astroidal score ${score.value}, ${label}"><p class="eyebrow">Astroidal score</p><p class="verdict-row"><b>${score.value}</b><span class="verdict-label">${label}</span></p><p class="quiet">${escapeHtml(score.reason)}</p></section>`
+  const label = score.verdict === "passed" ? "Passed" : "Fix first";
+  return `<section class="verdict verdict-${score.verdict}" aria-label="Astroidal score ${score.value}, ${label}"><p class="eyebrow">Astroidal score</p><p class="verdict-row"><b>${score.value}</b><span class="verdict-label">${label}</span></p><p class="quiet">${escapeHtml(score.reason)}</p></section>`;
 }
 
-function impactSurface(impact: Graph['impact']): string {
-  const blast = clampScore(impact.blastRadius)
-  const complexity = clampScore(impact.complexityDelta)
-  const security = clampScore(impact.securityExposure)
-  const performance = clampScore(impact.performanceImpact)
-  const guide = astroidPath(160, 156, 108, 100, 100, 100, 100)
-  const value = astroidPath(160, 156, 108, blast, complexity, security, performance)
+function impactSurface(impact: Graph["impact"]): string {
+  const blast = clampScore(impact.blastRadius);
+  const complexity = clampScore(impact.complexityDelta);
+  const security = clampScore(impact.securityExposure);
+  const performance = clampScore(impact.performanceImpact);
+  const guide = astroidPath(160, 156, 108, 100, 100, 100, 100);
+  const value = astroidPath(
+    160,
+    156,
+    108,
+    blast,
+    complexity,
+    security,
+    performance,
+  );
   return `<svg class="surface" viewBox="0 0 320 312" role="img" aria-label="Impact surface. Blast ${blast}. Complexity ${signed(impact.complexityRaw)}. Security ${security}. Performance ${performance}.">
     <defs><radialGradient id="astroid-fill" cx="50%" cy="50%" r="65%"><stop offset="0%" stop-color="#7F00FF" stop-opacity="0.45" /><stop offset="78%" stop-color="#00F2FE" stop-opacity="0.16" /></radialGradient></defs>
     <path class="guide" d="${guide}" />
     <line class="axis" x1="160" y1="48" x2="160" y2="264" />
     <line class="axis" x1="52" y1="156" x2="268" y2="156" />
     <path class="value" d="${value}" fill="url(#astroid-fill)" />
-    ${cuspMark(160 + (blast / 100) * 108, 156, '#00F2FE')}
-    ${cuspMark(160, 156 - (complexity / 100) * 108, '#D2B4FF')}
-    ${cuspMark(160 - (security / 100) * 108, 156, '#FFB020')}
-    ${cuspMark(160, 156 + (performance / 100) * 108, '#9AF7FF')}
+    ${cuspMark(160 + (blast / 100) * 108, 156, "#00F2FE")}
+    ${cuspMark(160, 156 - (complexity / 100) * 108, "#D2B4FF")}
+    ${cuspMark(160 - (security / 100) * 108, 156, "#FFB020")}
+    ${cuspMark(160, 156 + (performance / 100) * 108, "#9AF7FF")}
     <text class="axis-name" x="160" y="22" text-anchor="middle">Complexity</text>
     <text class="axis-value" x="160" y="40" text-anchor="middle" fill="#D2B4FF">${signed(impact.complexityRaw)}</text>
     <text class="axis-name" x="276" y="150" text-anchor="start">Blast</text>
@@ -379,70 +426,98 @@ function impactSurface(impact: Graph['impact']): string {
     <text class="axis-value" x="44" y="168" text-anchor="end" fill="#FFB020">${security}</text>
     <text class="axis-name" x="160" y="286" text-anchor="middle">Performance</text>
     <text class="axis-value" x="160" y="304" text-anchor="middle" fill="#9AF7FF">${performance}</text>
-  </svg>`
+  </svg>`;
 }
 
 function cuspMark(x: number, y: number, color: string): string {
-  return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${color}" />`
+  return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${color}" />`;
 }
 
 function clampScore(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)))
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function astroidPath(cx: number, cy: number, maxR: number, right: number, top: number, left: number, bottom: number): string {
-  const commands: string[] = []
-  const steps = 128
+function astroidPath(
+  cx: number,
+  cy: number,
+  maxR: number,
+  right: number,
+  top: number,
+  left: number,
+  bottom: number,
+): string {
+  const commands: string[] = [];
+  const steps = 128;
   for (let index = 0; index <= steps; index += 1) {
-    const turn = (index / steps) * Math.PI * 2
-    const cosine = Math.cos(turn)
-    const sine = Math.sin(turn)
-    const horizontal = (cosine >= 0 ? right : left) / 100
-    const vertical = (sine >= 0 ? bottom : top) / 100
-    const x = cx + Math.sign(cosine) * Math.abs(cosine) ** 3 * horizontal * maxR
-    const y = cy + Math.sign(sine) * Math.abs(sine) ** 3 * vertical * maxR
-    commands.push(`${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`)
+    const turn = (index / steps) * Math.PI * 2;
+    const cosine = Math.cos(turn);
+    const sine = Math.sin(turn);
+    const horizontal = (cosine >= 0 ? right : left) / 100;
+    const vertical = (sine >= 0 ? bottom : top) / 100;
+    const x =
+      cx + Math.sign(cosine) * Math.abs(cosine) ** 3 * horizontal * maxR;
+    const y = cy + Math.sign(sine) * Math.abs(sine) ** 3 * vertical * maxR;
+    commands.push(`${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`);
   }
-  return `${commands.join(' ')} Z`
+  return `${commands.join(" ")} Z`;
 }
 
 function tierLabel(tier: string): string {
-  if (tier === 'full') return 'Full review'
-  if (tier === 'lite') return 'Lite review'
-  return 'Light pass'
+  if (tier === "full") return "Full review";
+  if (tier === "lite") return "Lite review";
+  return "Light pass";
 }
 
-function astroidMarkup(cx: number, cy: number, radius: number, stroke: number): string {
-  const commands: string[] = []
+function astroidMarkup(
+  cx: number,
+  cy: number,
+  radius: number,
+  stroke: number,
+): string {
+  const commands: string[] = [];
   for (let index = 0; index <= 96; index += 1) {
-    const turn = (index / 96) * Math.PI * 2
-    const x = cx + radius * Math.cos(turn) ** 3
-    const y = cy + radius * Math.sin(turn) ** 3
-    commands.push(`${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`)
+    const turn = (index / 96) * Math.PI * 2;
+    const x = cx + radius * Math.cos(turn) ** 3;
+    const y = cy + radius * Math.sin(turn) ** 3;
+    commands.push(`${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`);
   }
-  return `<path d="${commands.join(' ')} Z" fill="none" stroke="#00F2FE" stroke-width="${stroke}" />`
+  return `<path d="${commands.join(" ")} Z" fill="none" stroke="#00F2FE" stroke-width="${stroke}" />`;
 }
 
-function countSpectral(nodes: GraphNode[], spectral: GraphNode['spectral']): number {
-  return nodes.filter((node) => node.role === 'changed' && node.spectral === spectral).length
+function countSpectral(
+  nodes: GraphNode[],
+  spectral: GraphNode["spectral"],
+): number {
+  return nodes.filter(
+    (node) => node.role === "changed" && node.spectral === spectral,
+  ).length;
 }
 
 function signed(value: number): string {
-  return value > 0 ? `+${value}` : String(value)
+  return value > 0 ? `+${value}` : String(value);
 }
 
 function escapeHtml(value: string): string {
-  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function loadSky(): string {
-  const here = dirname(fileURLToPath(import.meta.url))
-  for (const candidate of [join(here, 'sky-script.js'), join(here, '..', 'src', 'sky-script.js')]) {
+  const here = dirname(fileURLToPath(import.meta.url));
+  for (const candidate of [
+    join(here, "sky-script.js"),
+    join(here, "..", "src", "sky-script.js"),
+  ]) {
     try {
-      return readFileSync(candidate, 'utf8')
+      return readFileSync(candidate, "utf8");
     } catch {
-      continue
+      continue;
     }
   }
-  throw new Error('Astroidal could not find sky-script.js next to the compiled CLI.')
+  throw new Error(
+    "Astroidal could not find sky-script.js next to the compiled CLI.",
+  );
 }

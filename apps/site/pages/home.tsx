@@ -83,7 +83,6 @@ function Hero() {
                 How a review goes
               </a>
             </div>
-            
           </div>
           <figure className="pointer-events-auto rise lg:col-span-7 [animation-delay:200ms]">
             <div className="overflow-hidden rounded-2xl border border-white/15 bg-[#0C111C] shadow-[0_30px_90px_rgba(0,0,0,0.45)]">

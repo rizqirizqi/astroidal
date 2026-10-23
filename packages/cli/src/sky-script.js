@@ -38,14 +38,17 @@
     };
   });
   var byId = {};
-  var changedCount = 0;
   nodes.forEach(function (node) {
     byId[node.id] = node;
-    if (node.role === "changed") changedCount += 1;
     findings.forEach(function (finding) {
       if (finding.path === node.path) node.findings.push(finding);
     });
-    if (node.findings.some(function (finding) { return finding.severity === "critical" || finding.severity === "high"; })) node.r = 7.5;
+    if (
+      node.findings.some(function (finding) {
+        return finding.severity === "critical" || finding.severity === "high";
+      })
+    )
+      node.r = 7.5;
   });
 
   var camera = { x: 0, y: 0, scale: 1 };
@@ -57,11 +60,18 @@
   var filter = "all";
   var moved = false;
   var clusters = [];
-  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var reduced =
+    window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var stars = [];
   var random = mulberry32(42);
   for (var star = 0; star < 110; star += 1) {
-    stars.push({ x: (random() - 0.5) * 2200, y: (random() - 0.5) * 1400, s: random() * 1.3 + 0.25, a: random() });
+    stars.push({
+      x: (random() - 0.5) * 2200,
+      y: (random() - 0.5) * 1400,
+      s: random() * 1.3 + 0.25,
+      a: random(),
+    });
   }
 
   function resize() {
@@ -86,9 +96,13 @@
     var claimed = {};
     var clouds = [];
     (data.groups || []).forEach(function (group) {
-      var members = (group.paths || []).filter(function (path) { return byPath[path] && !claimed[path]; });
+      var members = (group.paths || []).filter(function (path) {
+        return byPath[path] && !claimed[path];
+      });
       if (!group.name || members.length < 2) return;
-      members.forEach(function (path) { claimed[path] = true; });
+      members.forEach(function (path) {
+        claimed[path] = true;
+      });
       clouds.push({ label: group.name, kind: "logic", paths: members });
     });
     var directories = {};
@@ -100,7 +114,11 @@
     });
     var directoryNames = Object.keys(directories).sort();
     directoryNames.forEach(function (key) {
-      clouds.push({ label: directoryLabel(key, directoryNames), kind: "directory", paths: directories[key] });
+      clouds.push({
+        label: directoryLabel(key, directoryNames),
+        kind: "directory",
+        paths: directories[key],
+      });
     });
     clouds.forEach(function (cloud, index) {
       var turn = index * 2.399963;
@@ -113,10 +131,15 @@
       cloud.paths.forEach(function (path, index) {
         var wobble = hash(path);
         var turn = index * 2.399963 + wobble * 0.7;
-        var ring = cloud.paths.length === 1 ? 0 : 78 + Math.sqrt(index) * 54 + wobble * 26;
+        var ring =
+          cloud.paths.length === 1
+            ? 0
+            : 78 + Math.sqrt(index) * 54 + wobble * 26;
         files.push({
           path: path,
-          nodes: byPath[path].slice().sort(function (left, right) { return left.line - right.line; }),
+          nodes: byPath[path].slice().sort(function (left, right) {
+            return left.line - right.line;
+          }),
           cloud: cloud,
           x: cloud.x + Math.cos(turn) * ring,
           y: cloud.y + Math.sin(turn) * ring,
@@ -134,27 +157,47 @@
         }
         var turn = (index / file.nodes.length) * Math.PI * 2 - Math.PI / 2;
         var ring = 26 + Math.min(file.nodes.length, 8) * 7;
-        place(node, file.x + Math.cos(turn) * ring, file.y + Math.sin(turn) * ring);
+        place(
+          node,
+          file.x + Math.cos(turn) * ring,
+          file.y + Math.sin(turn) * ring,
+        );
       });
-      clusters.push({ x: file.x, y: file.y, label: fileLabel(file.path), nodes: file.nodes, kind: "file" });
+      clusters.push({
+        x: file.x,
+        y: file.y,
+        label: fileLabel(file.path),
+        nodes: file.nodes,
+        kind: "file",
+      });
     });
     clouds.forEach(function (cloud) {
       var members = [];
-      cloud.paths.forEach(function (path) { members = members.concat(byPath[path]); });
+      cloud.paths.forEach(function (path) {
+        members = members.concat(byPath[path]);
+      });
       clusters.push({ label: cloud.label, nodes: members, kind: cloud.kind });
     });
     var neighborSlot = {};
-    nodes.filter(function (node) { return node.role === "neighbor"; }).forEach(function (node, index) {
-      var link = linkedChange(node);
-      if (!link) {
-        place(node, Math.cos(index) * 280, Math.sin(index) * 280);
-        return;
-      }
-      var slot = neighborSlot[link.id] || 0;
-      neighborSlot[link.id] = slot + 1;
-      var away = Math.atan2(link.y, link.x);
-      place(node, link.x + Math.cos(away) * (72 + slot * 26), link.y + Math.sin(away) * (72 + slot * 26));
-    });
+    nodes
+      .filter(function (node) {
+        return node.role === "neighbor";
+      })
+      .forEach(function (node, index) {
+        var link = linkedChange(node);
+        if (!link) {
+          place(node, Math.cos(index) * 280, Math.sin(index) * 280);
+          return;
+        }
+        var slot = neighborSlot[link.id] || 0;
+        neighborSlot[link.id] = slot + 1;
+        var away = Math.atan2(link.y, link.x);
+        place(
+          node,
+          link.x + Math.cos(away) * (72 + slot * 26),
+          link.y + Math.sin(away) * (72 + slot * 26),
+        );
+      });
   }
 
   function relax(files) {
@@ -167,7 +210,9 @@
       linked[to.path + "|" + from.path] = true;
     });
     for (var step = 0; step < 46; step += 1) {
-      var force = files.map(function () { return { x: 0, y: 0 }; });
+      var force = files.map(function () {
+        return { x: 0, y: 0 };
+      });
       for (var left = 0; left < files.length; left += 1) {
         for (var right = left + 1; right < files.length; right += 1) {
           var dx = files[right].x - files[left].x;
@@ -206,10 +251,21 @@
   function directoryLabel(key, keys) {
     if (key === "(root)") return "root";
     var parts = key.split("/");
-    var broad = { lib: 1, src: 1, app: 1, apps: 1, packages: 1, components: 1, test: 1, tests: 1, __tests__: 1 };
+    var broad = {
+      lib: 1,
+      src: 1,
+      app: 1,
+      apps: 1,
+      packages: 1,
+      components: 1,
+      test: 1,
+      tests: 1,
+      __tests__: 1,
+    };
     function tail(count) {
       var slice = parts.slice(-count);
-      if (count === 1 && broad[slice[0]] && parts.length > 1) return parts.slice(-2).join("/");
+      if (count === 1 && broad[slice[0]] && parts.length > 1)
+        return parts.slice(-2).join("/");
       var text = slice.join("/");
       return text.length > 32 ? text.slice(0, 31) + "..." : text;
     }
@@ -218,9 +274,12 @@
       var clash = keys.some(function (other) {
         if (other === key || other === "(root)") return false;
         var otherParts = other.split("/");
-        var otherLabel = count === 1 && broad[otherParts[otherParts.length - 1]] && otherParts.length > 1
-          ? otherParts.slice(-2).join("/")
-          : otherParts.slice(-count).join("/");
+        var otherLabel =
+          count === 1 &&
+          broad[otherParts[otherParts.length - 1]] &&
+          otherParts.length > 1
+            ? otherParts.slice(-2).join("/")
+            : otherParts.slice(-count).join("/");
         return otherLabel === label;
       });
       if (!clash) return label;
@@ -231,14 +290,16 @@
   function hash(value) {
     var total = 0;
     var text = String(value);
-    for (var index = 0; index < text.length; index += 1) total = (total * 33 + text.charCodeAt(index)) % 997;
+    for (var index = 0; index < text.length; index += 1)
+      total = (total * 33 + text.charCodeAt(index)) % 997;
     return total / 997;
   }
 
   function linkedChange(node) {
     var found = null;
     edges.forEach(function (edge) {
-      var otherId = edge.from === node.id ? edge.to : edge.to === node.id ? edge.from : "";
+      var otherId =
+        edge.from === node.id ? edge.to : edge.to === node.id ? edge.from : "";
       var other = byId[otherId];
       if (other && other.role === "changed") found = other;
     });
@@ -267,7 +328,12 @@
   function fitCamera() {
     var width = canvas.clientWidth || 800;
     var height = canvas.clientHeight || 600;
-    var box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    var box = {
+      minX: Infinity,
+      minY: Infinity,
+      maxX: -Infinity,
+      maxY: -Infinity,
+    };
     nodes.forEach(function (node) {
       box.minX = Math.min(box.minX, node.x - 120);
       box.minY = Math.min(box.minY, node.y - 48);
@@ -282,14 +348,27 @@
     }
     var spanX = Math.max(box.maxX - box.minX + 160, 280);
     var spanY = Math.max(box.maxY - box.minY + 160, 220);
-    camera.scale = Math.min(1.25, Math.max(0.38, Math.min((width - 48) / spanX, (height - 48) / spanY)));
+    camera.scale = Math.min(
+      1.25,
+      Math.max(0.38, Math.min((width - 48) / spanX, (height - 48) / spanY)),
+    );
     camera.x = -((box.minX + box.maxX) / 2);
     camera.y = -((box.minY + box.maxY) / 2);
   }
 
   function colorFor(node) {
-    if (node.findings.some(function (finding) { return finding.severity === "critical"; })) return "#FFB020";
-    if (node.findings.some(function (finding) { return finding.severity === "high"; })) return "#D2B4FF";
+    if (
+      node.findings.some(function (finding) {
+        return finding.severity === "critical";
+      })
+    )
+      return "#FFB020";
+    if (
+      node.findings.some(function (finding) {
+        return finding.severity === "high";
+      })
+    )
+      return "#D2B4FF";
     if (node.spectral === "contract") return "#D2B4FF";
     if (node.spectral === "logic") return "#00F2FE";
     if (node.role === "neighbor") return "#7E8BA3";
@@ -301,7 +380,8 @@
     if (node.units.indexOf(filter) !== -1) return true;
     if (node.role !== "neighbor") return false;
     return edges.some(function (edge) {
-      var otherId = edge.from === node.id ? edge.to : edge.to === node.id ? edge.from : "";
+      var otherId =
+        edge.from === node.id ? edge.to : edge.to === node.id ? edge.from : "";
       var other = byId[otherId];
       return other && other.units.indexOf(filter) !== -1;
     });
@@ -323,7 +403,11 @@
 
   function traceShape(node, x, y, radius) {
     context.beginPath();
-    if (node.spectral === "contract" && node.role === "changed" && node.findings.length === 0) {
+    if (
+      node.spectral === "contract" &&
+      node.role === "changed" &&
+      node.findings.length === 0
+    ) {
       context.moveTo(x, y - radius);
       context.lineTo(x + radius, y);
       context.lineTo(x, y + radius);
@@ -331,7 +415,11 @@
       context.closePath();
       return;
     }
-    if (node.spectral === "text" && node.role === "changed" && node.findings.length === 0) {
+    if (
+      node.spectral === "text" &&
+      node.role === "changed" &&
+      node.findings.length === 0
+    ) {
       var side = radius * 1.7;
       context.rect(x - side / 2, y - side / 2, side, side);
       return;
@@ -371,15 +459,24 @@
       var dx = point.x - center.x;
       var dy = point.y - center.y;
       var length = Math.sqrt(dx * dx + dy * dy) || 1;
-      return { x: point.x + (dx / length) * pad, y: point.y + (dy / length) * pad };
+      return {
+        x: point.x + (dx / length) * pad,
+        y: point.y + (dy / length) * pad,
+      };
     });
     if (expanded.length === 1) {
       context.beginPath();
       context.arc(expanded[0].x, expanded[0].y, pad + 18, 0, Math.PI * 2);
     } else traceBlob(expanded);
-    context.fillStyle = cluster.kind === "logic" ? "rgba(127,0,255,0.14)" : "rgba(0,242,254,0.055)";
+    context.fillStyle =
+      cluster.kind === "logic"
+        ? "rgba(127,0,255,0.14)"
+        : "rgba(0,242,254,0.055)";
     context.fill();
-    context.strokeStyle = cluster.kind === "logic" ? "rgba(210,180,255,0.72)" : "rgba(0,242,254,0.32)";
+    context.strokeStyle =
+      cluster.kind === "logic"
+        ? "rgba(210,180,255,0.72)"
+        : "rgba(0,242,254,0.32)";
     context.lineWidth = cluster.kind === "logic" ? 1.4 : 1;
     context.setLineDash(cluster.kind === "logic" ? [5, 5] : []);
     context.stroke();
@@ -387,7 +484,9 @@
   }
 
   function traceBlob(points) {
-    function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+    function mid(a, b) {
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
     context.beginPath();
     var start = mid(points[0], points[1 % points.length]);
     context.moveTo(start.x, start.y);
@@ -401,17 +500,29 @@
   }
 
   function convexHull(points) {
-    var sorted = points.slice().sort(function (a, b) { return a.x - b.x || a.y - b.y; });
-    function cross(o, a, b) { return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x); }
+    var sorted = points.slice().sort(function (a, b) {
+      return a.x - b.x || a.y - b.y;
+    });
+    function cross(o, a, b) {
+      return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    }
     var lower = [];
     sorted.forEach(function (point) {
-      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) lower.pop();
+      while (
+        lower.length >= 2 &&
+        cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0
+      )
+        lower.pop();
       lower.push(point);
     });
     var upper = [];
     for (var index = sorted.length - 1; index >= 0; index -= 1) {
       var point = sorted[index];
-      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) upper.pop();
+      while (
+        upper.length >= 2 &&
+        cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0
+      )
+        upper.pop();
       upper.push(point);
     }
     lower.pop();
@@ -422,12 +533,19 @@
   function paintLabel(text, x, y, fill, font, align, force, taken) {
     context.font = font;
     var width = Math.min(168, context.measureText(text).width);
-    var left = align === "center" ? x - width / 2 : align === "right" ? x - width : x;
+    var left =
+      align === "center" ? x - width / 2 : align === "right" ? x - width : x;
     var box = { x: left, y: y - 12, w: width, h: 15 };
     if (!force) {
       for (var index = 0; index < taken.length; index += 1) {
         var other = taken[index];
-        if (box.x < other.x + other.w + 6 && box.x + box.w + 6 > other.x && box.y < other.y + other.h + 4 && box.y + box.h + 4 > other.y) return;
+        if (
+          box.x < other.x + other.w + 6 &&
+          box.x + box.w + 6 > other.x &&
+          box.y < other.y + other.h + 4 &&
+          box.y + box.h + 4 > other.y
+        )
+          return;
       }
     }
     taken.push(box);
@@ -443,7 +561,8 @@
   function fileAnchor(node) {
     var cluster = null;
     clusters.forEach(function (item) {
-      if (item.kind === "file" && item.nodes.indexOf(node) !== -1) cluster = item;
+      if (item.kind === "file" && item.nodes.indexOf(node) !== -1)
+        cluster = item;
     });
     if (!cluster) return toScreen(node.x, node.y);
     return toScreen(cluster.x, cluster.y);
@@ -473,7 +592,14 @@
     var height = canvas.clientHeight;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
-    var wash = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.1, width / 2, height / 2, Math.max(width, height) * 0.72);
+    var wash = context.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.1,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.72,
+    );
     wash.addColorStop(0, "rgba(127,0,255,0.13)");
     wash.addColorStop(0.42, "rgba(11,15,25,0)");
     wash.addColorStop(1, "rgba(5,7,12,0.45)");
@@ -503,7 +629,16 @@
       var bend = curvePoint(start, end);
       var hot = edgeTouches(edge, hover) || edgeTouches(edge, selected);
       var crosses = from.path !== to.path;
-      context.strokeStyle = edge.kind === "caller" ? (hot ? "rgba(255,176,32,0.9)" : "rgba(255,176,32,0.55)") : (hot ? "rgba(0,242,254,0.95)" : crosses ? "rgba(0,242,254,0.62)" : "rgba(0,242,254,0.35)");
+      context.strokeStyle =
+        edge.kind === "caller"
+          ? hot
+            ? "rgba(255,176,32,0.9)"
+            : "rgba(255,176,32,0.55)"
+          : hot
+            ? "rgba(0,242,254,0.95)"
+            : crosses
+              ? "rgba(0,242,254,0.62)"
+              : "rgba(0,242,254,0.35)";
       context.lineWidth = hot ? 1.8 : crosses ? 1.45 : 1.05;
       context.beginPath();
       context.moveTo(start.x, start.y);
@@ -515,7 +650,14 @@
       var point = toScreen(node.x, node.y);
       var color = colorFor(node);
       var radius = node.r * (hover === node ? 1.35 : 1);
-      var glow = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 6);
+      var glow = context.createRadialGradient(
+        point.x,
+        point.y,
+        0,
+        point.x,
+        point.y,
+        radius * 6,
+      );
       glow.addColorStop(0, color);
       glow.addColorStop(1, "rgba(11,15,25,0)");
       context.fillStyle = glow;
@@ -552,12 +694,35 @@
         if (!top || point.y < top.y) top = point;
       });
       if (!top) return;
-      paintLabel(cluster.label, top.x, top.y - 28, cluster.kind === "logic" ? "#D2B4FF" : "rgba(0,242,254,0.9)", "12px ui-monospace, monospace", "center", true, taken);
+      paintLabel(
+        cluster.label,
+        top.x,
+        top.y - 28,
+        cluster.kind === "logic" ? "#D2B4FF" : "rgba(0,242,254,0.9)",
+        "12px ui-monospace, monospace",
+        "center",
+        true,
+        taken,
+      );
     });
     clusters.forEach(function (cluster) {
-      if (cluster.kind !== "file" || cluster.nodes.length < 2 || !cluster.nodes.some(isVisible)) return;
+      if (
+        cluster.kind !== "file" ||
+        cluster.nodes.length < 2 ||
+        !cluster.nodes.some(isVisible)
+      )
+        return;
       var point = toScreen(cluster.x, cluster.y);
-      paintLabel(cluster.label, point.x, point.y - 22 - cluster.nodes.length * 3, "rgba(0,242,254,0.8)", "11px ui-monospace, monospace", "center", false, taken);
+      paintLabel(
+        cluster.label,
+        point.x,
+        point.y - 22 - cluster.nodes.length * 3,
+        "rgba(0,242,254,0.8)",
+        "11px ui-monospace, monospace",
+        "center",
+        false,
+        taken,
+      );
     });
     nodes.forEach(function (node) {
       if (node.role !== "changed" || !isVisible(node)) return;
@@ -567,7 +732,16 @@
       var dy = point.y - anchor.y;
       var length = Math.sqrt(dx * dx + dy * dy) || 1;
       var forced = node === hover || node === selected;
-      paintLabel(trimName(node.name), point.x + (dx / length) * (node.r + 10), point.y + (dy / length) * (node.r + 10) + 4, forced ? "#E8EEF8" : "rgba(232,238,248,0.9)", "12px ui-monospace, monospace", dx >= 0 ? "left" : "right", forced, taken);
+      paintLabel(
+        trimName(node.name),
+        point.x + (dx / length) * (node.r + 10),
+        point.y + (dy / length) * (node.r + 10) + 4,
+        forced ? "#E8EEF8" : "rgba(232,238,248,0.9)",
+        "12px ui-monospace, monospace",
+        dx >= 0 ? "left" : "right",
+        forced,
+        taken,
+      );
     });
   }
 
@@ -581,7 +755,9 @@
       var dy = y - point.y;
       var distance = Math.sqrt(dx * dx + dy * dy);
       var limit = Math.max(32, node.r * 6 + 14);
-      var hit = distance <= limit || (node.role === "changed" && labelContains(node, point, x, y));
+      var hit =
+        distance <= limit ||
+        (node.role === "changed" && labelContains(node, point, x, y));
       if (!hit || distance >= best) return;
       best = distance;
       found = node;
@@ -598,7 +774,12 @@
     var labelY = point.y + (dy / length) * (node.r + 10) + 4;
     var width = Math.min(168, trimName(node.name).length * 7.2);
     var left = dx < 0 ? labelX - width : labelX;
-    return x >= left - 8 && x <= left + width + 8 && y >= labelY - 16 && y <= labelY + 8;
+    return (
+      x >= left - 8 &&
+      x <= left + width + 8 &&
+      y >= labelY - 16 &&
+      y <= labelY + 8
+    );
   }
 
   function showTip(node, x, y) {
@@ -620,21 +801,40 @@
     if (!detail) return;
     detail.textContent = "";
     document.querySelectorAll("[data-index]").forEach(function (button) {
-      button.classList.toggle("is-on", node ? Number(button.getAttribute("data-index")) === node.index : false);
+      button.classList.toggle(
+        "is-on",
+        node ? Number(button.getAttribute("data-index")) === node.index : false,
+      );
     });
     if (!node) {
       addText("p", "Lens", "eyebrow");
-      addText("p", "Select a star. Click it again, or the empty sky, to clear it.");
+      addText(
+        "p",
+        "Select a star. Click it again, or the empty sky, to clear it.",
+      );
       return;
     }
     addText("p", node.kind + " · " + node.spectral, "eyebrow");
     addText("h2", node.name);
     addText("p", node.path + ":" + node.line, "mono");
     if (node.signature) addText("p", node.signature);
-    addText("p", node.complexityDelta ? "Complexity " + node.complexity + " (" + signed(node.complexityDelta) + ")" : "Complexity " + node.complexity);
+    addText(
+      "p",
+      node.complexityDelta
+        ? "Complexity " +
+            node.complexity +
+            " (" +
+            signed(node.complexityDelta) +
+            ")"
+        : "Complexity " + node.complexity,
+    );
     if (node.prs.length) addText("p", "PR " + node.prs.join(", "));
     node.findings.forEach(function (finding) {
-      addText("p", finding.id + " " + finding.severity + " — " + finding.description, "alert");
+      addText(
+        "p",
+        finding.id + " " + finding.severity + " — " + finding.description,
+        "alert",
+      );
     });
     renderReview(node);
   }
@@ -672,7 +872,10 @@
     if (!file || file.binary || !file.patch) {
       var empty = document.createElement("p");
       empty.className = "diff-empty";
-      empty.textContent = file && file.binary ? "Binary file. There is no text diff to review." : "No line diff is stored for this file.";
+      empty.textContent =
+        file && file.binary
+          ? "Binary file. There is no text diff to review."
+          : "No line diff is stored for this file.";
       review.appendChild(empty);
       detail.appendChild(review);
       if (node.excerpt) {
@@ -685,7 +888,8 @@
     if (file.partial) {
       var note = document.createElement("p");
       note.className = "diff-note";
-      note.textContent = "Remote diff. This review shows the changed lines only.";
+      note.textContent =
+        "Remote diff. This review shows the changed lines only.";
       review.appendChild(note);
     }
     var body = document.createElement("div");
@@ -708,7 +912,11 @@
       tr.className = row.kind + (marksSymbol(row, node) ? " is-mark" : "");
       appendCell(tr, "ln", row.oldLine == null ? "" : String(row.oldLine));
       appendCell(tr, "ln", row.newLine == null ? "" : String(row.newLine));
-      appendCell(tr, "sign", row.kind === "add" ? "+" : row.kind === "del" ? "-" : "");
+      appendCell(
+        tr,
+        "sign",
+        row.kind === "add" ? "+" : row.kind === "del" ? "-" : "",
+      );
       appendCell(tr, "code", row.text);
       table.appendChild(tr);
     });
@@ -717,7 +925,10 @@
     detail.appendChild(review);
     var mark = table.querySelector(".is-mark");
     if (!mark) return;
-    var top = mark.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+    var top =
+      mark.getBoundingClientRect().top -
+      body.getBoundingClientRect().top +
+      body.scrollTop;
     body.scrollTop = Math.max(0, top - 48);
   }
 
@@ -738,7 +949,9 @@
       return row.oldLine >= start && row.oldLine <= end;
     }
     if (removed || row.newLine == null) return false;
-    return row.newLine >= node.line && row.newLine <= (node.endLine || node.line);
+    return (
+      row.newLine >= node.line && row.newLine <= (node.endLine || node.line)
+    );
   }
 
   function parsePatch(patch) {
@@ -746,36 +959,64 @@
     var oldLine = 0;
     var newLine = 0;
     var inHunk = false;
-    String(patch || "").split(/\r?\n/).forEach(function (line) {
-      var hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-      if (hunk) {
-        oldLine = Number(hunk[1]);
-        newLine = Number(hunk[2]);
-        inHunk = true;
-        rows.push({ kind: "hunk", text: line });
-        return;
-      }
-      if (!inHunk || line.charAt(0) === "\\") return;
-      if (line.indexOf("diff --git ") === 0 || line.indexOf("index ") === 0 || line.indexOf("--- ") === 0 || line.indexOf("+++ ") === 0 || line.indexOf("new file ") === 0 || line.indexOf("deleted file ") === 0 || line.indexOf("rename ") === 0 || line.indexOf("similarity ") === 0 || line.indexOf("old mode ") === 0 || line.indexOf("new mode ") === 0) {
-        inHunk = false;
-        return;
-      }
-      if (line.charAt(0) === "+") {
-        rows.push({ kind: "add", oldLine: null, newLine: newLine, text: line.slice(1) });
-        newLine += 1;
-        return;
-      }
-      if (line.charAt(0) === "-") {
-        rows.push({ kind: "del", oldLine: oldLine, newLine: null, text: line.slice(1) });
-        oldLine += 1;
-        return;
-      }
-      if (line.charAt(0) === " ") {
-        rows.push({ kind: "ctx", oldLine: oldLine, newLine: newLine, text: line.slice(1) });
-        oldLine += 1;
-        newLine += 1;
-      }
-    });
+    String(patch || "")
+      .split(/\r?\n/)
+      .forEach(function (line) {
+        var hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+        if (hunk) {
+          oldLine = Number(hunk[1]);
+          newLine = Number(hunk[2]);
+          inHunk = true;
+          rows.push({ kind: "hunk", text: line });
+          return;
+        }
+        if (!inHunk || line.charAt(0) === "\\") return;
+        if (
+          line.indexOf("diff --git ") === 0 ||
+          line.indexOf("index ") === 0 ||
+          line.indexOf("--- ") === 0 ||
+          line.indexOf("+++ ") === 0 ||
+          line.indexOf("new file ") === 0 ||
+          line.indexOf("deleted file ") === 0 ||
+          line.indexOf("rename ") === 0 ||
+          line.indexOf("similarity ") === 0 ||
+          line.indexOf("old mode ") === 0 ||
+          line.indexOf("new mode ") === 0
+        ) {
+          inHunk = false;
+          return;
+        }
+        if (line.charAt(0) === "+") {
+          rows.push({
+            kind: "add",
+            oldLine: null,
+            newLine: newLine,
+            text: line.slice(1),
+          });
+          newLine += 1;
+          return;
+        }
+        if (line.charAt(0) === "-") {
+          rows.push({
+            kind: "del",
+            oldLine: oldLine,
+            newLine: null,
+            text: line.slice(1),
+          });
+          oldLine += 1;
+          return;
+        }
+        if (line.charAt(0) === " ") {
+          rows.push({
+            kind: "ctx",
+            oldLine: oldLine,
+            newLine: newLine,
+            text: line.slice(1),
+          });
+          oldLine += 1;
+          newLine += 1;
+        }
+      });
     return rows;
   }
 
@@ -823,19 +1064,29 @@
   }
 
   function nodeForAlert(path, line) {
-    var matches = nodes.filter(function (node) { return node.path === path; });
-    var changed = matches.filter(function (node) { return node.role === "changed"; });
+    var matches = nodes.filter(function (node) {
+      return node.path === path;
+    });
+    var changed = matches.filter(function (node) {
+      return node.role === "changed";
+    });
     var pool = changed.length ? changed : matches;
     if (!pool.length) return null;
     if (typeof line !== "number" || isNaN(line)) return pool[0];
     return pool.reduce(function (best, node) {
-      return Math.abs(node.line - line) < Math.abs(best.line - line) ? node : best;
+      return Math.abs(node.line - line) < Math.abs(best.line - line)
+        ? node
+        : best;
     }, pool[0]);
   }
 
   canvas.addEventListener("mousemove", function (event) {
     var point = localPoint(event);
-    if (down && (Math.abs(point.x - down.x) > 4 || Math.abs(point.y - down.y) > 4)) down.moved = true;
+    if (
+      down &&
+      (Math.abs(point.x - down.x) > 4 || Math.abs(point.y - down.y) > 4)
+    )
+      down.moved = true;
     if (drag) {
       var world = toWorld(point.x, point.y);
       drag.node.x = world.x + drag.dx;
@@ -901,11 +1152,15 @@
     down = null;
   });
 
-  canvas.addEventListener("wheel", function (event) {
-    event.preventDefault();
-    var point = localPoint(event);
-    zoom(event.deltaY > 0 ? 0.92 : 1.08, point.x, point.y);
-  }, { passive: false });
+  canvas.addEventListener(
+    "wheel",
+    function (event) {
+      event.preventDefault();
+      var point = localPoint(event);
+      zoom(event.deltaY > 0 ? 0.92 : 1.08, point.x, point.y);
+    },
+    { passive: false },
+  );
 
   sky.addEventListener("keydown", function (event) {
     var step = 48 / camera.scale;
@@ -934,13 +1189,20 @@
   var lensIn = document.getElementById("lens-in");
   var lensOut = document.getElementById("lens-out");
   var lensFit = document.getElementById("lens-fit");
-  if (lensIn) lensIn.addEventListener("click", function () { zoom(1.15); });
-  if (lensOut) lensOut.addEventListener("click", function () { zoom(0.87); });
-  if (lensFit) lensFit.addEventListener("click", function () {
-    moved = false;
-    fitCamera();
-    scheduleDraw();
-  });
+  if (lensIn)
+    lensIn.addEventListener("click", function () {
+      zoom(1.15);
+    });
+  if (lensOut)
+    lensOut.addEventListener("click", function () {
+      zoom(0.87);
+    });
+  if (lensFit)
+    lensFit.addEventListener("click", function () {
+      moved = false;
+      fitCamera();
+      scheduleDraw();
+    });
 
   document.querySelectorAll("[data-filter]").forEach(function (button) {
     button.addEventListener("click", function () {
@@ -972,10 +1234,17 @@
   document.querySelectorAll("[data-alert-path]").forEach(function (button) {
     button.addEventListener("click", function () {
       var line = Number(button.getAttribute("data-alert-line"));
-      var node = nodeForAlert(button.getAttribute("data-alert-path") || "", line);
+      var node = nodeForAlert(
+        button.getAttribute("data-alert-path") || "",
+        line,
+      );
       if (!node) return;
       focusNode(node);
-      if (detail && detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
+      if (detail && detail.scrollIntoView)
+        detail.scrollIntoView({
+          block: "nearest",
+          behavior: reduced ? "auto" : "smooth",
+        });
     });
   });
 
@@ -997,27 +1266,46 @@
     }
     applySymbolFilter();
   }
-  if (viewList) viewList.addEventListener("click", function () { setSymbolView("list"); });
-  if (viewTree) viewTree.addEventListener("click", function () { setSymbolView("tree"); });
+  if (viewList)
+    viewList.addEventListener("click", function () {
+      setSymbolView("list");
+    });
+  if (viewTree)
+    viewTree.addEventListener("click", function () {
+      setSymbolView("tree");
+    });
 
   var symbolFilter = document.getElementById("symbol-filter");
   var indexEmpty = document.getElementById("index-empty");
   function applySymbolFilter() {
     var query = symbolFilter ? symbolFilter.value.trim().toLowerCase() : "";
-    document.querySelectorAll(".symbols [data-index]").forEach(function (button) {
-      var haystack = (button.getAttribute("data-search") || button.textContent || "").toLowerCase();
-      button.hidden = query.length > 0 && haystack.indexOf(query) === -1;
-    });
-    document.querySelectorAll("#symbol-tree .tree-file").forEach(function (item) {
-      item.hidden = !item.querySelector("[data-index]:not([hidden])");
-    });
-    Array.prototype.slice.call(document.querySelectorAll("#symbol-tree details")).reverse().forEach(function (folder) {
-      var visible = folder.querySelector("[data-index]:not([hidden])");
-      if (folder.parentElement) folder.parentElement.hidden = !visible;
-      if (query && visible) folder.open = true;
-    });
+    document
+      .querySelectorAll(".symbols [data-index]")
+      .forEach(function (button) {
+        var haystack = (
+          button.getAttribute("data-search") ||
+          button.textContent ||
+          ""
+        ).toLowerCase();
+        button.hidden = query.length > 0 && haystack.indexOf(query) === -1;
+      });
+    document
+      .querySelectorAll("#symbol-tree .tree-file")
+      .forEach(function (item) {
+        item.hidden = !item.querySelector("[data-index]:not([hidden])");
+      });
+    Array.prototype.slice
+      .call(document.querySelectorAll("#symbol-tree details"))
+      .reverse()
+      .forEach(function (folder) {
+        var visible = folder.querySelector("[data-index]:not([hidden])");
+        if (folder.parentElement) folder.parentElement.hidden = !visible;
+        if (query && visible) folder.open = true;
+      });
     var active = symbolTree && !symbolTree.hidden ? symbolTree : symbolList;
-    var shown = active ? active.querySelectorAll("[data-index]:not([hidden])").length : 0;
+    var shown = active
+      ? active.querySelectorAll("[data-index]:not([hidden])").length
+      : 0;
     if (indexEmpty) indexEmpty.hidden = query.length === 0 || shown !== 0;
   }
   if (symbolFilter) symbolFilter.addEventListener("input", applySymbolFilter);

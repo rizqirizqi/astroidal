@@ -95,7 +95,11 @@ const LINKS = [
   [17, 1],
 ];
 
-const CLOUD_SEEDS: Array<{ label: string; kind: CloudKind; indexes: number[] }> = [
+const CLOUD_SEEDS: Array<{
+  label: string;
+  kind: CloudKind;
+  indexes: number[];
+}> = [
   { label: "cli", kind: "directory", indexes: [0, 1, 2, 3, 4, 5] },
   { label: "review", kind: "logic", indexes: [6, 7, 8, 9, 10] },
   { label: "skills", kind: "directory", indexes: [11, 12, 13, 14, 15] },
@@ -114,7 +118,9 @@ function createSky() {
   const clouds: Cloud[] = CLOUD_SEEDS.map((cloud) => ({
     label: cloud.label,
     kind: cloud.kind,
-    nodes: cloud.indexes.map((index) => nodes[index]).filter((node) => node != null),
+    nodes: cloud.indexes
+      .map((index) => nodes[index])
+      .filter((node) => node != null),
   }));
   const cloudOf = new Map<SkyNode, Cloud>();
   clouds.forEach((cloud) => {
@@ -291,7 +297,14 @@ export function Starfield() {
         const point = toScreen(node.x, node.y);
         const color = colorFor(node);
         const radius = node.r * (hover === node ? 1.35 : 1);
-        const glow = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 6);
+        const glow = ctx.createRadialGradient(
+          point.x,
+          point.y,
+          0,
+          point.x,
+          point.y,
+          radius * 6,
+        );
         glow.addColorStop(0, color);
         glow.addColorStop(1, "rgba(11,15,25,0)");
         ctx.fillStyle = glow;
@@ -372,7 +385,10 @@ export function Starfield() {
         const dx = point.x - center.x;
         const dy = point.y - center.y;
         const length = Math.sqrt(dx * dx + dy * dy) || 1;
-        return { x: point.x + (dx / length) * pad, y: point.y + (dy / length) * pad };
+        return {
+          x: point.x + (dx / length) * pad,
+          y: point.y + (dy / length) * pad,
+        };
       });
       const ctx = context!;
       if (expanded.length === 1) {
@@ -381,9 +397,15 @@ export function Starfield() {
         ctx.beginPath();
         ctx.arc(only.x, only.y, pad + 18, 0, Math.PI * 2);
       } else traceBlob(expanded);
-      ctx.fillStyle = cloud.kind === "logic" ? "rgba(127,0,255,0.14)" : "rgba(0,242,254,0.055)";
+      ctx.fillStyle =
+        cloud.kind === "logic"
+          ? "rgba(127,0,255,0.14)"
+          : "rgba(0,242,254,0.055)";
       ctx.fill();
-      ctx.strokeStyle = cloud.kind === "logic" ? "rgba(210,180,255,0.72)" : "rgba(0,242,254,0.32)";
+      ctx.strokeStyle =
+        cloud.kind === "logic"
+          ? "rgba(210,180,255,0.72)"
+          : "rgba(0,242,254,0.32)";
       ctx.lineWidth = cloud.kind === "logic" ? 1.4 : 1;
       ctx.setLineDash(cloud.kind === "logic" ? [5, 5] : []);
       ctx.stroke();
@@ -414,7 +436,10 @@ export function Starfield() {
     function convexHull(points: Point[]) {
       const sorted = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
       function cross(origin: Point, a: Point, b: Point) {
-        return (a.x - origin.x) * (b.y - origin.y) - (a.y - origin.y) * (b.x - origin.x);
+        return (
+          (a.x - origin.x) * (b.y - origin.y) -
+          (a.y - origin.y) * (b.x - origin.x)
+        );
       }
       const lower: Point[] = [];
       sorted.forEach((point) => {
@@ -456,7 +481,8 @@ export function Starfield() {
       const ctx = context!;
       ctx.font = font;
       const width = Math.min(168, ctx.measureText(text).width);
-      const left = align === "center" ? x - width / 2 : align === "right" ? x - width : x;
+      const left =
+        align === "center" ? x - width / 2 : align === "right" ? x - width : x;
       const box = { x: left, y: y - 12, w: width, h: 15 };
       if (!force) {
         const hits = taken.some(
@@ -578,7 +604,11 @@ export function Starfield() {
 
     function handlePointerMove(event: PointerEvent) {
       const point = localPoint(event);
-      if (down && (Math.abs(point.x - down.x) > 4 || Math.abs(point.y - down.y) > 4)) down.moved = true;
+      if (
+        down &&
+        (Math.abs(point.x - down.x) > 4 || Math.abs(point.y - down.y) > 4)
+      )
+        down.moved = true;
       if (drag) {
         const world = toWorld(point.x, point.y);
         drag.node.x = world.x + drag.dx;

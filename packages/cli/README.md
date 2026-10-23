@@ -35,12 +35,12 @@ Reply with the score, Passed or Fix first, and the paths to .astroidal/review.md
 
 ## Output
 
-| File | What it is |
-| --- | --- |
-| `.astroidal/constellation.html` | The map and the score |
-| `.astroidal/packets/bug-map.md` | What the agent searches |
-| `.astroidal/review.md` | Ranked findings, after `rank` |
-| `.astroidal/graph.json` | The same map for tools |
+| File                            | What it is                    |
+| ------------------------------- | ----------------------------- |
+| `.astroidal/constellation.html` | The map and the score         |
+| `.astroidal/packets/bug-map.md` | What the agent searches       |
+| `.astroidal/review.md`          | Ranked findings, after `rank` |
+| `.astroidal/graph.json`         | The same map for tools        |
 
 Rank keeps critical, high, and medium findings that quote a real line in the change or a direct neighbor. Those findings show on the map.
 

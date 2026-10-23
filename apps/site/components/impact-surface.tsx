@@ -21,7 +21,8 @@ function astroidPath(
     const sine = Math.sin(turn);
     const horizontal = (cosine >= 0 ? right : left) / 100;
     const vertical = (sine >= 0 ? bottom : top) / 100;
-    const x = cx + Math.sign(cosine) * Math.abs(cosine) ** 3 * horizontal * maxR;
+    const x =
+      cx + Math.sign(cosine) * Math.abs(cosine) ** 3 * horizontal * maxR;
     const y = cy + Math.sign(sine) * Math.abs(sine) ** 3 * vertical * maxR;
     commands.push(`${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`);
   }
@@ -30,7 +31,15 @@ function astroidPath(
 
 export function ImpactSurface() {
   const guide = astroidPath(160, 156, 108, 100, 100, 100, 100);
-  const value = astroidPath(160, 156, 108, BLAST, COMPLEXITY, SECURITY, PERFORMANCE);
+  const value = astroidPath(
+    160,
+    156,
+    108,
+    BLAST,
+    COMPLEXITY,
+    SECURITY,
+    PERFORMANCE,
+  );
 
   return (
     <svg
@@ -45,15 +54,61 @@ export function ImpactSurface() {
           <stop offset="78%" stopColor="#00F2FE" stopOpacity="0.16" />
         </radialGradient>
       </defs>
-      <path d={guide} fill="none" stroke="rgba(232,238,248,0.2)" strokeWidth="1" />
-      <line x1="160" y1="48" x2="160" y2="264" stroke="rgba(232,238,248,0.16)" strokeWidth="1" />
-      <line x1="52" y1="156" x2="268" y2="156" stroke="rgba(232,238,248,0.16)" strokeWidth="1" />
-      <path d={value} fill="url(#passed-astroid-fill)" stroke="#00F2FE" strokeWidth="1.75" />
+      <path
+        d={guide}
+        fill="none"
+        stroke="rgba(232,238,248,0.2)"
+        strokeWidth="1"
+      />
+      <line
+        x1="160"
+        y1="48"
+        x2="160"
+        y2="264"
+        stroke="rgba(232,238,248,0.16)"
+        strokeWidth="1"
+      />
+      <line
+        x1="52"
+        y1="156"
+        x2="268"
+        y2="156"
+        stroke="rgba(232,238,248,0.16)"
+        strokeWidth="1"
+      />
+      <path
+        d={value}
+        fill="url(#passed-astroid-fill)"
+        stroke="#00F2FE"
+        strokeWidth="1.75"
+      />
       <circle cx={160 + (BLAST / 100) * 108} cy="156" r="3.5" fill="#00F2FE" />
-      <circle cx="160" cy={156 - (COMPLEXITY / 100) * 108} r="3.5" fill="#D2B4FF" />
-      <circle cx={160 - (SECURITY / 100) * 108} cy="156" r="3.5" fill="#FFB020" />
-      <circle cx="160" cy={156 + (PERFORMANCE / 100) * 108} r="3.5" fill="#9AF7FF" />
-      <text x="160" y="22" textAnchor="middle" fill="#A8B3C7" fontSize="11" letterSpacing="0.06em">
+      <circle
+        cx="160"
+        cy={156 - (COMPLEXITY / 100) * 108}
+        r="3.5"
+        fill="#D2B4FF"
+      />
+      <circle
+        cx={160 - (SECURITY / 100) * 108}
+        cy="156"
+        r="3.5"
+        fill="#FFB020"
+      />
+      <circle
+        cx="160"
+        cy={156 + (PERFORMANCE / 100) * 108}
+        r="3.5"
+        fill="#9AF7FF"
+      />
+      <text
+        x="160"
+        y="22"
+        textAnchor="middle"
+        fill="#A8B3C7"
+        fontSize="11"
+        letterSpacing="0.06em"
+      >
         Complexity
       </text>
       <text
@@ -67,7 +122,14 @@ export function ImpactSurface() {
       >
         +{COMPLEXITY_RAW}
       </text>
-      <text x="276" y="150" textAnchor="start" fill="#A8B3C7" fontSize="11" letterSpacing="0.06em">
+      <text
+        x="276"
+        y="150"
+        textAnchor="start"
+        fill="#A8B3C7"
+        fontSize="11"
+        letterSpacing="0.06em"
+      >
         Blast
       </text>
       <text
@@ -81,7 +143,14 @@ export function ImpactSurface() {
       >
         {BLAST}
       </text>
-      <text x="44" y="150" textAnchor="end" fill="#A8B3C7" fontSize="11" letterSpacing="0.06em">
+      <text
+        x="44"
+        y="150"
+        textAnchor="end"
+        fill="#A8B3C7"
+        fontSize="11"
+        letterSpacing="0.06em"
+      >
         Security
       </text>
       <text
@@ -95,7 +164,14 @@ export function ImpactSurface() {
       >
         {SECURITY}
       </text>
-      <text x="160" y="286" textAnchor="middle" fill="#A8B3C7" fontSize="11" letterSpacing="0.06em">
+      <text
+        x="160"
+        y="286"
+        textAnchor="middle"
+        fill="#A8B3C7"
+        fontSize="11"
+        letterSpacing="0.06em"
+      >
         Performance
       </text>
       <text

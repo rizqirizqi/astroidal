@@ -30,10 +30,15 @@
   "scripts": {
     "build": "tsc && cp src/sky-script.js dist/sky-script.js",
     "test": "npm run build && node --test dist/*.test.js",
-    "prepack": "npm run build && rm -f dist/*.test.js"
+    "prepack": "npm run build && rm -f dist/*.test.js",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix",
+    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
+    "@astroidal/eslint-config": "*",
     "@types/node": "^24.10.0",
+    "eslint": "^9.39.4",
     "typescript": "^5.9.3"
   }
 }
