@@ -1,0 +1,81 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --color-night: #0b0f19;
+  --color-panel: #0c111c;
+  --color-ink: #e8eef8;
+  --color-mist: #a8b3c7;
+  --color-glow: #00f2fe;
+  --color-nebula: #7f00ff;
+  --color-iris: #d2b4ff;
+  --color-flare: #ffb020;
+  --color-line: rgb(232 238 248 / 0.14);
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(
+      900px 420px at 12% -10%,
+      rgb(127 0 255 / 0.22),
+      transparent 55%
+    ),
+    radial-gradient(
+      700px 380px at 100% 0%,
+      rgb(0 242 254 / 0.08),
+      transparent 50%
+    ),
+    var(--color-night);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgb(0 242 254 / 0.28);
+  color: var(--color-ink);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sky-mask {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgb(0 0 0 / 0.45) 22%,
+    #000 48%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .rise {
+    animation: none;
+  }
+}

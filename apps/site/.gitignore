@@ -1,0 +1,9 @@
+node_modules/
+.webstorio/
+*.log
+.env
+.env.local
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/settings.json

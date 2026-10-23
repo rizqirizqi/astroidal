@@ -1,0 +1,11 @@
+node_modules
+.webstorio
+dist
+.cache
+.env
+*.log
+.vscode
+.idea
+.DS_Store
+package-lock.json
+assets
