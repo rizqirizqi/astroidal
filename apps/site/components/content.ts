@@ -1,5 +1,7 @@
 export const GITHUB_URL = "https://github.com/rizqirizqi/astroidal";
 export const ISSUES_URL = "https://github.com/rizqirizqi/astroidal/issues";
+export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
+export const INSTALL_COMMAND = "npx --yes astroidal";
 
 export const SETUP_PROMPT = `Set up Astroidal and review this change. Do not add it as a dependency. Run:
 

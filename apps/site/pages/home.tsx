@@ -59,7 +59,7 @@ function Hero() {
       />
       <div className="pointer-events-none relative z-10 mx-auto max-w-6xl px-4 pt-16 pb-16 sm:px-6 sm:pt-20 lg:pt-24 lg:pb-20">
         <p className="rise font-brand-secondary text-[11px] tracking-[0.2em] text-brand-primary uppercase">
-          AI code review map
+          Open source · AI code review map
         </p>
         <h1 className="rise mt-4 max-w-4xl text-[2.7rem] leading-[0.96] font-medium tracking-[-0.045em] text-brand-text [animation-delay:80ms] sm:text-6xl lg:text-7xl">
           Give your agent a map.
@@ -83,18 +83,7 @@ function Hero() {
                 How a review goes
               </a>
             </div>
-            <ul className="mt-8 flex flex-wrap gap-2">
-              {["No dependency", "MIT license", "npx --yes astroidal"].map(
-                (item) => (
-                  <li
-                    key={item}
-                    className="rounded-full border border-white/15 px-3 py-1 font-brand-secondary text-[11px] tracking-[0.08em] text-[#D2B4FF] uppercase"
-                  >
-                    {item}
-                  </li>
-                ),
-              )}
-            </ul>
+            
           </div>
           <figure className="pointer-events-auto rise lg:col-span-7 [animation-delay:200ms]">
             <div className="overflow-hidden rounded-2xl border border-white/15 bg-[#0C111C] shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
@@ -380,8 +369,13 @@ function Score() {
           </p>
           <dl className="mt-8 grid gap-4 sm:grid-cols-2">
             {AXES.map((axis) => (
-              <div key={axis.name} className="rounded-2xl border border-white/15 p-4">
-                <dt className={`font-brand-secondary text-xs tracking-[0.12em] uppercase ${axis.tone}`}>
+              <div
+                key={axis.name}
+                className="rounded-2xl border border-white/15 p-4"
+              >
+                <dt
+                  className={`font-brand-secondary text-xs tracking-[0.12em] uppercase ${axis.tone}`}
+                >
                   {axis.name}
                 </dt>
                 <dd className="mt-2 text-sm leading-6 text-[#A8B3C7]">

@@ -6,6 +6,7 @@ interface CopyButtonProps {
   label: string;
   copiedLabel?: string;
   tone?: "glow" | "quiet";
+  variant?: "text" | "icon";
 }
 
 export function CopyButton({
@@ -13,6 +14,7 @@ export function CopyButton({
   label,
   copiedLabel = "Copied",
   tone = "glow",
+  variant = "text",
 }: CopyButtonProps) {
   const [isCopied, setIsCopied] = useState(false);
 
@@ -31,6 +33,27 @@ export function CopyButton({
       ? "bg-brand-primary text-brand-bg shadow-[0_0_28px_rgba(0,242,254,0.35)] hover:bg-[#7af8ff]"
       : "border border-white/15 bg-white/5 text-brand-text hover:border-brand-primary/70";
 
+  const icon = isCopied ? (
+    <Check className="size-4" aria-hidden="true" />
+  ) : (
+    <Copy className="size-4" aria-hidden="true" />
+  );
+  const accessibleLabel = isCopied ? copiedLabel : label;
+
+  if (variant === "icon") {
+    return (
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-live="polite"
+        className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl text-brand-text transition-colors duration-200 hover:text-brand-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+      >
+        {icon}
+        <span className="sr-only">{accessibleLabel}</span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -38,12 +61,8 @@ export function CopyButton({
       aria-live="polite"
       className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary ${toneClass}`}
     >
-      {isCopied ? (
-        <Check className="size-4" aria-hidden="true" />
-      ) : (
-        <Copy className="size-4" aria-hidden="true" />
-      )}
-      {isCopied ? copiedLabel : label}
+      {icon}
+      {accessibleLabel}
     </button>
   );
 }

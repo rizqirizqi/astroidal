@@ -1,4 +1,5 @@
-import { GITHUB_URL, ISSUES_URL, NAV_ITEMS } from "./content";
+import { Github } from "lucide-react";
+import { GITHUB_URL, ISSUES_URL, LICENSE_URL, NAV_ITEMS } from "./content";
 import { Mark } from "./mark";
 
 export default function Footer() {
@@ -46,9 +47,10 @@ export default function Footer() {
             <li>
               <a
                 href={GITHUB_URL}
-                className="cursor-pointer text-sm text-brand-text no-underline transition-colors duration-200 hover:text-brand-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+                className="inline-flex cursor-pointer items-center gap-2 text-sm text-brand-text no-underline transition-colors duration-200 hover:text-brand-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
               >
-                Source on GitHub
+                <Github className="size-4" aria-hidden="true" />
+                GitHub
               </a>
             </li>
             <li>
@@ -61,7 +63,7 @@ export default function Footer() {
             </li>
             <li>
               <a
-                href={`${GITHUB_URL}/blob/main/LICENSE`}
+                href={LICENSE_URL}
                 className="cursor-pointer text-sm text-brand-text no-underline transition-colors duration-200 hover:text-brand-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
               >
                 MIT License
