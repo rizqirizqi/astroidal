@@ -214,7 +214,7 @@ export function renderConstellation(graph: Graph): string {
         <li><i class="shape orbit" aria-hidden="true"></i> Orbit</li>
       </ul>
       ${unitScores}
-      <div id="detail"><p class="eyebrow">Lens</p><p>Select a star. Its orbit shows one hop of callers and callees.</p></div>
+      <div id="detail"><p class="eyebrow">Lens</p><p>Select a star. Click it again, or the empty sky, to clear it.</p></div>
       <h2>Cusp alerts</h2>
       ${alerts}
       <h2>Changed symbols</h2>

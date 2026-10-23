@@ -48,6 +48,7 @@
   var hover = null;
   var drag = null;
   var pan = null;
+  var down = null;
   var filter = "all";
   var moved = false;
   var looping = false;
@@ -561,15 +562,33 @@
   }
 
   function nodeAt(x, y) {
-    var world = toWorld(x, y);
     var found = null;
+    var best = Infinity;
     nodes.forEach(function (node) {
       if (!isVisible(node)) return;
-      var dx = node.x - world.x;
-      var dy = node.y - world.y;
-      if (dx * dx + dy * dy <= (node.r + 8) * (node.r + 8)) found = node;
+      var point = toScreen(node.x, node.y);
+      var dx = x - point.x;
+      var dy = y - point.y;
+      var distance = Math.sqrt(dx * dx + dy * dy);
+      var limit = Math.max(32, node.r * 6 + 14);
+      var hit = distance <= limit || (node.role === "changed" && labelContains(node, point, x, y));
+      if (!hit || distance >= best) return;
+      best = distance;
+      found = node;
     });
     return found;
+  }
+
+  function labelContains(node, point, x, y) {
+    var anchor = fileAnchor(node);
+    var dx = point.x - anchor.x;
+    var dy = point.y - anchor.y;
+    var length = Math.sqrt(dx * dx + dy * dy) || 1;
+    var labelX = point.x + (dx / length) * (node.r + 10);
+    var labelY = point.y + (dy / length) * (node.r + 10) + 4;
+    var width = Math.min(168, trimName(node.name).length * 7.2);
+    var left = dx < 0 ? labelX - width : labelX;
+    return x >= left - 8 && x <= left + width + 8 && y >= labelY - 16 && y <= labelY + 8;
   }
 
   function showTip(node, x, y) {
@@ -595,7 +614,7 @@
     });
     if (!node) {
       addText("p", "Lens", "eyebrow");
-      addText("p", "Select a star. Its orbit shows one hop of callers and callees.");
+      addText("p", "Select a star. Click it again, or the empty sky, to clear it.");
       return;
     }
     addText("p", node.kind + " · " + node.spectral, "eyebrow");
@@ -638,6 +657,7 @@
 
   canvas.addEventListener("mousemove", function (event) {
     var point = localPoint(event);
+    if (down && (Math.abs(point.x - down.x) > 4 || Math.abs(point.y - down.y) > 4)) down.moved = true;
     if (drag) {
       var world = toWorld(point.x, point.y);
       drag.node.x = world.x + drag.dx;
@@ -662,11 +682,14 @@
   canvas.addEventListener("mousedown", function (event) {
     var point = localPoint(event);
     var node = nodeAt(point.x, point.y);
+    down = { x: point.x, y: point.y, node: node, was: selected, moved: false };
     if (node) {
       var world = toWorld(point.x, point.y);
       drag = { node: node, dx: node.x - world.x, dy: node.y - world.y };
-      selected = node;
-      showDetail(node);
+      if (selected !== node) {
+        selected = node;
+        showDetail(node);
+      }
       return;
     }
     pan = { x: point.x, y: point.y };
@@ -678,8 +701,17 @@
   });
 
   window.addEventListener("mouseup", function () {
+    if (down && !down.moved) {
+      var sameStar = down.node && down.was === down.node;
+      if (sameStar || (!down.node && selected)) {
+        selected = null;
+        showDetail(null);
+        if (reduced) draw();
+      }
+    }
     drag = null;
     pan = null;
+    down = null;
   });
 
   canvas.addEventListener("wheel", function (event) {
@@ -695,7 +727,14 @@
     else if (event.key === "ArrowDown") camera.y -= step;
     else if (event.key === "+" || event.key === "=") zoom(1.12);
     else if (event.key === "-" || event.key === "_") zoom(0.9);
-    else if (event.key === "0") {
+    else if (event.key === "Escape") {
+      if (!selected) return;
+      selected = null;
+      showDetail(null);
+      event.preventDefault();
+      if (reduced) draw();
+      return;
+    } else if (event.key === "0") {
       moved = false;
       fitCamera();
     } else return;
@@ -732,6 +771,12 @@
       var index = Number(button.getAttribute("data-index"));
       var node = nodes[index];
       if (!node) return;
+      if (selected === node) {
+        selected = null;
+        showDetail(null);
+        if (reduced) draw();
+        return;
+      }
       selected = node;
       showDetail(node);
       moved = true;
