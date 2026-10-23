@@ -127,7 +127,6 @@ function summarize(graph: Graph): string {
     `Mapped ${graph.units.map((unit) => unit.label).join(', ') || 'nothing'}: ${graph.summary.files} files, ${graph.summary.symbols} symbols, ${graph.summary.neighbors} neighbors.`,
     `Impact: blast ${impact.blastRadius} (${impact.blastFiles} files), complexity ${impact.complexityRaw >= 0 ? '+' : ''}${impact.complexityRaw}, security ${impact.securityExposure}, performance ${impact.performanceImpact}.`,
     `Score ${graph.score.value}: ${graph.score.verdict === 'passed' ? 'Passed' : 'Fix first'}. ${graph.score.reason}`,
-    `Share: Astroidal ${graph.score.value} · ${graph.score.verdict === 'passed' ? 'Passed' : 'Fix first'} on ${graph.repoName}. The AI code review map. npx --yes astroidal graph`,
     ...graph.notes,
     graph.commands.length > 0 ? `Commands: ${graph.commands.join(' | ')}` : '',
     'Wrote .astroidal/constellation.html and .astroidal/packets/bug-map.md',
