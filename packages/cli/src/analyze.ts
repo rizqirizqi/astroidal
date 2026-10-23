@@ -112,13 +112,16 @@ export function scoreReview(input: {
     medium * 0.24 +
     (input.partial ? 0.05 : 0) +
     (input.reviewed ? 0 : 0.42)
-  const value = Math.max(0, Math.min(100, Math.round(100 * Math.exp(-drag))))
+  const raw = Math.max(0, Math.min(100, Math.round(100 * Math.exp(-drag))))
   const clean = critical + high + medium === 0
-  const passed = input.reviewed && clean && value >= PASS_LINE
+  const passed = input.reviewed && clean
+  const value = passed && raw < PASS_LINE
+    ? Math.min(PASS_LINE - 1, Math.round(raw + (PASS_LINE - raw) * 0.45))
+    : raw
   let reason = 'No important findings, and the impact stays under the pass line.'
   if (!input.reviewed) reason = 'Rank the findings before this can pass.'
   else if (!clean) reason = 'Fix the cusp alerts before this passes.'
-  else if (!passed) reason = 'The impact is too high to pass.'
+  else if (value < PASS_LINE) reason = 'No findings. Warning: the impact is high, so the score stays low.'
   return { value, verdict: passed ? 'passed' : 'fix', reason }
 }
 

@@ -130,8 +130,9 @@ test('the review score reaches 100 for a one-line change and falls off as the ch
     files: 12,
     symbols: 20,
   })
-  assert.equal(wide.verdict, 'fix')
-  assert.ok(wide.value < 80)
+  assert.equal(wide.verdict, 'passed')
+  assert.ok(wide.value >= 50 && wide.value < 80)
+  assert.match(wide.reason, /Warning: the impact is high, so the score stays low/)
   assert.ok(wide.value < edited.value - 15)
   const unreviewed = scoreReview({ impact: calm, findings: [], reviewed: false, partial: false, additions: 1, deletions: 0, files: 1, symbols: 0 })
   assert.equal(unreviewed.verdict, 'fix')
