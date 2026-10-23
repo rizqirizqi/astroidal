@@ -56,7 +56,6 @@
   var down = null;
   var filter = "all";
   var moved = false;
-  var looping = false;
   var clusters = [];
   var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var stars = [];
@@ -72,7 +71,7 @@
     canvas.height = Math.max(1, Math.floor(bounds.height * ratio));
     layout();
     if (!moved) fitCamera();
-    if (!looping) draw();
+    draw();
   }
 
   function layout() {
@@ -459,13 +458,21 @@
     return { x: midX + (-dy / length) * 14, y: midY + (dx / length) * 14 };
   }
 
+  var paintFrame = 0;
+  function scheduleDraw() {
+    if (paintFrame) return;
+    paintFrame = requestAnimationFrame(function () {
+      paintFrame = 0;
+      draw();
+    });
+  }
+
   function draw() {
     var ratio = window.devicePixelRatio || 1;
     var width = canvas.clientWidth;
     var height = canvas.clientHeight;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
-    var time = reduced ? 0 : Date.now() / 1000;
     var wash = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.1, width / 2, height / 2, Math.max(width, height) * 0.72);
     wash.addColorStop(0, "rgba(127,0,255,0.13)");
     wash.addColorStop(0.42, "rgba(11,15,25,0)");
@@ -474,7 +481,7 @@
     context.fillRect(0, 0, width, height);
     stars.forEach(function (star) {
       var point = toScreen(star.x, star.y);
-      context.globalAlpha = 0.2 + star.a * 0.55 + (reduced ? 0 : Math.sin(time * 0.7 + star.a * 6) * 0.12);
+      context.globalAlpha = 0.2 + star.a * 0.55;
       context.fillStyle = star.a > 0.82 ? "#00F2FE" : "#E8EEF8";
       context.beginPath();
       context.arc(point.x, point.y, star.s, 0, Math.PI * 2);
@@ -507,8 +514,7 @@
       if (!isVisible(node)) return;
       var point = toScreen(node.x, node.y);
       var color = colorFor(node);
-      var pulse = selected === node && !reduced ? 1 + Math.sin(time * 3) * 0.08 : 1;
-      var radius = node.r * pulse * (hover === node ? 1.35 : 1);
+      var radius = node.r * (hover === node ? 1.35 : 1);
       var glow = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 6);
       glow.addColorStop(0, color);
       glow.addColorStop(1, "rgba(11,15,25,0)");
@@ -563,7 +569,6 @@
       var forced = node === hover || node === selected;
       paintLabel(trimName(node.name), point.x + (dx / length) * (node.r + 10), point.y + (dy / length) * (node.r + 10) + 4, forced ? "#E8EEF8" : "rgba(232,238,248,0.9)", "12px ui-monospace, monospace", dx >= 0 ? "left" : "right", forced, taken);
     });
-    if (looping) requestAnimationFrame(draw);
   }
 
   function nodeAt(x, y) {
@@ -804,7 +809,7 @@
     camera.x = (originX - width / 2) / camera.scale - before.x;
     camera.y = (originY - height / 2) / camera.scale - before.y;
     moved = true;
-    if (reduced) draw();
+    scheduleDraw();
   }
 
   function focusNode(node) {
@@ -814,7 +819,7 @@
     camera.x = -node.x;
     camera.y = -node.y;
     if (camera.scale < 1) camera.scale = 1;
-    if (reduced) draw();
+    scheduleDraw();
   }
 
   function nodeForAlert(path, line) {
@@ -835,7 +840,7 @@
       var world = toWorld(point.x, point.y);
       drag.node.x = world.x + drag.dx;
       drag.node.y = world.y + drag.dy;
-      if (reduced) draw();
+      scheduleDraw();
       return;
     }
     if (pan) {
@@ -844,11 +849,15 @@
       camera.y += (point.y - pan.y) / camera.scale;
       pan.x = point.x;
       pan.y = point.y;
-      if (reduced) draw();
+      scheduleDraw();
       return;
     }
-    hover = nodeAt(point.x, point.y);
-    canvas.style.cursor = hover ? "pointer" : "grab";
+    var next = nodeAt(point.x, point.y);
+    if (next !== hover) {
+      hover = next;
+      canvas.style.cursor = hover ? "pointer" : "grab";
+      scheduleDraw();
+    }
     showTip(hover, point.x, point.y);
   });
 
@@ -862,6 +871,7 @@
       if (selected !== node) {
         selected = node;
         showDetail(node);
+        scheduleDraw();
       }
       return;
     }
@@ -869,7 +879,11 @@
   });
 
   canvas.addEventListener("mouseleave", function () {
-    hover = null;
+    canvas.style.cursor = "grab";
+    if (hover) {
+      hover = null;
+      scheduleDraw();
+    }
     if (tip) tip.hidden = true;
   });
 
@@ -879,7 +893,7 @@
       if (sameStar || (!down.node && selected)) {
         selected = null;
         showDetail(null);
-        if (reduced) draw();
+        scheduleDraw();
       }
     }
     drag = null;
@@ -906,7 +920,7 @@
       selected = null;
       showDetail(null);
       event.preventDefault();
-      if (reduced) draw();
+      scheduleDraw();
       return;
     } else if (event.key === "0") {
       moved = false;
@@ -914,7 +928,7 @@
     } else return;
     moved = event.key !== "0";
     event.preventDefault();
-    if (reduced) draw();
+    scheduleDraw();
   });
 
   var lensIn = document.getElementById("lens-in");
@@ -925,7 +939,7 @@
   if (lensFit) lensFit.addEventListener("click", function () {
     moved = false;
     fitCamera();
-    if (reduced) draw();
+    scheduleDraw();
   });
 
   document.querySelectorAll("[data-filter]").forEach(function (button) {
@@ -936,7 +950,7 @@
         item.classList.toggle("is-on", on);
         item.setAttribute("aria-pressed", on ? "true" : "false");
       });
-      if (reduced) draw();
+      scheduleDraw();
     });
   });
 
@@ -948,7 +962,7 @@
       if (selected === node) {
         selected = null;
         showDetail(null);
-        if (reduced) draw();
+        scheduleDraw();
         return;
       }
       focusNode(node);
@@ -1011,10 +1025,6 @@
   window.addEventListener("resize", resize);
   showDetail(null);
   resize();
-  if (!reduced) {
-    looping = true;
-    requestAnimationFrame(draw);
-  }
 
   function mulberry32(seed) {
     return function () {
