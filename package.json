@@ -1,0 +1,34 @@
+{
+  "name": "astroidal",
+  "version": "0.1.0",
+  "description": "Syntax-level code review maps for AI agents. Run with npx, without adding a project dependency.",
+  "type": "module",
+  "bin": {
+    "astroidal": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "code-review",
+    "ast",
+    "cli",
+    "pull-request"
+  ],
+  "license": "MIT",
+  "author": "Mgs. M. Rizqi Fadhlurrahman <rizqirizqi23@gmail.com>",
+  "scripts": {
+    "build": "tsc && cp src/sky-script.js dist/sky-script.js",
+    "test": "npm run build && node --test dist/*.test.js",
+    "prepack": "npm run build && rm -f dist/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  }
+}
