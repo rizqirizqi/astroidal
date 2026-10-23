@@ -649,10 +649,40 @@
     return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
   }
 
-  function zoom(factor) {
+  function zoom(factor, screenX, screenY) {
+    var width = canvas.clientWidth || 1;
+    var height = canvas.clientHeight || 1;
+    var originX = typeof screenX === "number" ? screenX : width / 2;
+    var originY = typeof screenY === "number" ? screenY : height / 2;
+    var before = toWorld(originX, originY);
+    var next = Math.max(0.34, Math.min(2.8, camera.scale * factor));
+    if (next === camera.scale) return;
+    camera.scale = next;
+    camera.x = (originX - width / 2) / camera.scale - before.x;
+    camera.y = (originY - height / 2) / camera.scale - before.y;
     moved = true;
-    camera.scale = Math.max(0.34, Math.min(2.8, camera.scale * factor));
     if (reduced) draw();
+  }
+
+  function focusNode(node) {
+    selected = node;
+    showDetail(node);
+    moved = true;
+    camera.x = -node.x;
+    camera.y = -node.y;
+    if (camera.scale < 1) camera.scale = 1;
+    if (reduced) draw();
+  }
+
+  function nodeForAlert(path, line) {
+    var matches = nodes.filter(function (node) { return node.path === path; });
+    var changed = matches.filter(function (node) { return node.role === "changed"; });
+    var pool = changed.length ? changed : matches;
+    if (!pool.length) return null;
+    if (typeof line !== "number" || isNaN(line)) return pool[0];
+    return pool.reduce(function (best, node) {
+      return Math.abs(node.line - line) < Math.abs(best.line - line) ? node : best;
+    }, pool[0]);
   }
 
   canvas.addEventListener("mousemove", function (event) {
@@ -716,7 +746,8 @@
 
   canvas.addEventListener("wheel", function (event) {
     event.preventDefault();
-    zoom(event.deltaY > 0 ? 0.92 : 1.08);
+    var point = localPoint(event);
+    zoom(event.deltaY > 0 ? 0.92 : 1.08, point.x, point.y);
   }, { passive: false });
 
   sky.addEventListener("keydown", function (event) {
@@ -777,30 +808,62 @@
         if (reduced) draw();
         return;
       }
-      selected = node;
-      showDetail(node);
-      moved = true;
-      camera.x = -node.x;
-      camera.y = -node.y;
-      if (camera.scale < 1) camera.scale = 1;
-      if (reduced) draw();
+      focusNode(node);
     });
   });
 
+  document.querySelectorAll("[data-alert-path]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var line = Number(button.getAttribute("data-alert-line"));
+      var node = nodeForAlert(button.getAttribute("data-alert-path") || "", line);
+      if (!node) return;
+      focusNode(node);
+      if (detail && detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
+    });
+  });
+
+  var symbolList = document.getElementById("symbol-list");
+  var symbolTree = document.getElementById("symbol-tree");
+  var viewList = document.getElementById("view-list");
+  var viewTree = document.getElementById("view-tree");
+  function setSymbolView(mode) {
+    var treeOn = mode === "tree";
+    if (symbolList) symbolList.hidden = treeOn;
+    if (symbolTree) symbolTree.hidden = !treeOn;
+    if (viewList) {
+      viewList.classList.toggle("is-on", !treeOn);
+      viewList.setAttribute("aria-pressed", treeOn ? "false" : "true");
+    }
+    if (viewTree) {
+      viewTree.classList.toggle("is-on", treeOn);
+      viewTree.setAttribute("aria-pressed", treeOn ? "true" : "false");
+    }
+    applySymbolFilter();
+  }
+  if (viewList) viewList.addEventListener("click", function () { setSymbolView("list"); });
+  if (viewTree) viewTree.addEventListener("click", function () { setSymbolView("tree"); });
+
   var symbolFilter = document.getElementById("symbol-filter");
   var indexEmpty = document.getElementById("index-empty");
-  if (symbolFilter) {
-    symbolFilter.addEventListener("input", function () {
-      var query = symbolFilter.value.trim().toLowerCase();
-      var visible = 0;
-      document.querySelectorAll("[data-index]").forEach(function (button) {
-        var match = query.length === 0 || (button.textContent || "").toLowerCase().indexOf(query) !== -1;
-        button.hidden = !match;
-        if (match) visible += 1;
-      });
-      if (indexEmpty) indexEmpty.hidden = visible !== 0;
+  function applySymbolFilter() {
+    var query = symbolFilter ? symbolFilter.value.trim().toLowerCase() : "";
+    document.querySelectorAll(".symbols [data-index]").forEach(function (button) {
+      var haystack = (button.getAttribute("data-search") || button.textContent || "").toLowerCase();
+      button.hidden = query.length > 0 && haystack.indexOf(query) === -1;
     });
+    document.querySelectorAll("#symbol-tree .tree-file").forEach(function (item) {
+      item.hidden = !item.querySelector("[data-index]:not([hidden])");
+    });
+    Array.prototype.slice.call(document.querySelectorAll("#symbol-tree details")).reverse().forEach(function (folder) {
+      var visible = folder.querySelector("[data-index]:not([hidden])");
+      if (folder.parentElement) folder.parentElement.hidden = !visible;
+      if (query && visible) folder.open = true;
+    });
+    var active = symbolTree && !symbolTree.hidden ? symbolTree : symbolList;
+    var shown = active ? active.querySelectorAll("[data-index]:not([hidden])").length : 0;
+    if (indexEmpty) indexEmpty.hidden = query.length === 0 || shown !== 0;
   }
+  if (symbolFilter) symbolFilter.addEventListener("input", applySymbolFilter);
 
   window.addEventListener("resize", resize);
   showDetail(null);

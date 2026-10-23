@@ -8,14 +8,15 @@ export function renderConstellation(graph: Graph): string {
   const payload = JSON.stringify(graph).replaceAll('<', '\\u003c')
   const script = loadSky()
   const units = graph.units.map((unit) => `<button type="button" data-filter="${escapeHtml(unit.id)}" aria-pressed="false">${escapeHtml(unit.label)}</button>`).join('')
-  const index = graph.nodes
-    .map((node, index) => node.role === 'changed' ? `<button type="button" class="spec-${node.spectral}" data-index="${index}"><i aria-hidden="true"></i><span><strong>${escapeHtml(node.name)}</strong><small>${escapeHtml(node.path)}:${node.line}</small></span></button>` : '')
-    .filter(Boolean)
+  const changed = graph.nodes
+    .map((node, index) => ({ node, index }))
+    .filter((entry) => entry.node.role === 'changed')
     .slice(0, 80)
-    .join('')
+  const index = changed.map((entry) => symbolButton(entry, false)).join('')
+  const tree = symbolTree(changed)
   const alerts = graph.findings.length === 0
     ? '<p class="quiet">No cusp alerts on this map.</p>'
-    : `<ol class="alerts">${graph.findings.map((finding) => `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em> ${escapeHtml(finding.description)}<small>${escapeHtml(finding.path)}</small></li>`).join('')}</ol>`
+    : `<ol class="alerts">${graph.findings.map((finding) => `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em> ${escapeHtml(finding.description)}<button type="button" class="alert-path" data-alert-path="${escapeHtml(finding.path)}" data-alert-line="${finding.line ?? ''}" aria-label="Open ${escapeHtml(finding.path)} in the lens">${escapeHtml(finding.path)}${finding.line == null ? '' : `:${finding.line}`}</button></li>`).join('')}</ol>`
   const unitScores = graph.impact.byUnit.length > 1
     ? `<details class="unit-fold"><summary>${graph.impact.byUnit.length} pull requests</summary><ul class="units">${graph.impact.byUnit.map((unit) => `<li><span>${escapeHtml(unit.label)}</span><em>blast ${unit.blastRadius} · complexity ${signed(unit.complexityRaw)} · security ${unit.securityExposure} · perf ${unit.performanceImpact}</em></li>`).join('')}</ul></details>`
     : ''
@@ -43,6 +44,7 @@ export function renderConstellation(graph: Graph): string {
       --panel: #0C111C;
     }
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     html, body { height: 100%; }
     body {
       margin: 0;
@@ -73,7 +75,7 @@ export function renderConstellation(graph: Graph): string {
     .tier-trivial { color: var(--muted); }
     .scope { margin: 0; color: var(--muted); font-size: 13px; }
     .batch { display: flex; gap: 8px; overflow-x: auto; padding: 0 24px 12px; scrollbar-width: thin; }
-    .batch button, .lens-controls button, .index button, summary {
+    .batch button, .lens-controls button, .view-toggle button, .symbols button, summary {
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.02);
       border-radius: 999px;
@@ -81,7 +83,7 @@ export function renderConstellation(graph: Graph): string {
       transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
     }
     .batch button { flex: 0 0 auto; }
-    .batch button:hover, .lens-controls button:hover, .index button:hover, summary:hover { border-color: rgba(0, 242, 254, 0.55); }
+    .batch button:hover, .lens-controls button:hover, .view-toggle button:hover, .symbols button:hover, summary:hover { border-color: rgba(0, 242, 254, 0.55); }
     .batch button.is-on { border-color: var(--cyan); color: var(--cyan); background: rgba(0, 242, 254, 0.08); }
     main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; min-height: 0; }
     .sky, aside { min-height: 0; }
@@ -131,8 +133,8 @@ export function renderConstellation(graph: Graph): string {
     summary { display: inline-flex; border-radius: 10px; }
     .units { margin-top: 10px; display: grid; gap: 8px; }
     .units li { display: grid; gap: 2px; font-size: 13px; }
-    .units em, .quiet, .index small, .alerts small { color: var(--muted); font-style: normal; }
-    .units em, .alerts small { font-size: 12px; }
+    .units em, .quiet, .symbols small, .tree-file-name { color: var(--muted); font-style: normal; }
+    .units em, .tree-file-name { font-size: 12px; }
     #detail { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0 0 20px; background: rgba(255, 255, 255, 0.03); }
     #detail h2 { color: var(--ink); letter-spacing: -0.03em; text-transform: none; font-size: 22px; margin: 4px 0; }
     #detail .eyebrow { margin-bottom: 4px; }
@@ -143,18 +145,31 @@ export function renderConstellation(graph: Graph): string {
     .alerts em { font-style: normal; text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; color: var(--muted); }
     .sev-critical { border-color: var(--amber); }
     .sev-high { border-color: var(--violet-ink); }
-    .alerts small { display: block; margin-top: 4px; }
+    .alerts .alert-path { display: block; width: 100%; margin-top: 6px; padding: 0; border: 0; background: transparent; color: var(--cyan); font: 12px/1.4 "JetBrains Mono", ui-monospace, monospace; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+    .alerts .alert-path:hover { color: var(--ink); }
+    .symbol-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+    .symbol-head h2 { margin: 0; }
+    .view-toggle { display: flex; gap: 6px; }
+    .view-toggle button { border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+    .view-toggle button.is-on { border-color: var(--cyan); color: var(--cyan); background: rgba(0, 242, 254, 0.08); }
     .finder { width: 100%; margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.25); }
     .index { display: grid; gap: 6px; margin: 0; }
-    .index button { border-radius: 12px; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; }
-    .index button.is-on { border-color: var(--cyan); }
-    .index i { width: 8px; height: 8px; flex: 0 0 auto; }
-    .index .spec-logic i { background: var(--cyan); border-radius: 50%; }
-    .index .spec-contract i { background: var(--violet-ink); transform: rotate(45deg); }
-    .index .spec-text i { background: #C5D0E2; border-radius: 2px; }
-    .index span { display: grid; min-width: 0; }
-    .index strong { font-weight: 560; }
-    .index small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .symbols button { border-radius: 12px; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; width: 100%; }
+    .symbols button.is-on { border-color: var(--cyan); }
+    .symbols i { width: 8px; height: 8px; flex: 0 0 auto; }
+    .symbols .spec-logic i { background: var(--cyan); border-radius: 50%; }
+    .symbols .spec-contract i { background: var(--violet-ink); transform: rotate(45deg); }
+    .symbols .spec-text i { background: #C5D0E2; border-radius: 2px; }
+    .symbols span { display: grid; min-width: 0; }
+    .symbols strong { font-weight: 560; }
+    .symbols small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tree { margin: 0; }
+    .tree ul { list-style: none; margin: 0; padding: 0 0 0 12px; border-left: 1px solid var(--line); }
+    .tree > ul { padding-left: 0; border-left: 0; }
+    .tree li { margin: 0; }
+    .tree summary { border: 0; background: transparent; padding: 4px 0; color: var(--cyan); font-size: 12px; }
+    .tree summary:hover { border-color: transparent; }
+    .tree-file-name { display: block; margin: 8px 0 4px; font-family: "JetBrains Mono", ui-monospace, monospace; }
     @media (max-width: 860px) {
       html, body { height: auto; }
       body { display: block; }
@@ -165,7 +180,7 @@ export function renderConstellation(graph: Graph): string {
       .hint { display: none; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .batch button, .lens-controls button, .index button, summary { transition: none; }
+      .batch button, .lens-controls button, .view-toggle button, .symbols button, summary { transition: none; }
       .mark { filter: none; }
     }
   </style>
@@ -217,9 +232,16 @@ export function renderConstellation(graph: Graph): string {
       <div id="detail"><p class="eyebrow">Lens</p><p>Select a star. Click it again, or the empty sky, to clear it.</p></div>
       <h2>Cusp alerts</h2>
       ${alerts}
-      <h2>Changed symbols</h2>
+      <div class="symbol-head">
+        <h2>Changed symbols</h2>
+        <div class="view-toggle" role="group" aria-label="Changed symbols view">
+          <button type="button" id="view-list" class="is-on" aria-pressed="true">List</button>
+          <button type="button" id="view-tree" aria-pressed="false">Tree</button>
+        </div>
+      </div>
       <input id="symbol-filter" class="finder" type="search" placeholder="Filter symbols" aria-label="Filter symbols">
-      <div class="index">${index || '<p class="quiet">No symbols in this map.</p>'}</div>
+      <div class="index symbols" id="symbol-list">${index || '<p class="quiet">No symbols in this map.</p>'}</div>
+      ${tree}
       <p id="index-empty" class="quiet" hidden>No symbol matches.</p>
     </aside>
   </main>
@@ -241,6 +263,45 @@ function reviewOf(graph: Graph): ReviewScore {
     files: graph.summary.files,
     symbols: graph.summary.symbols,
   })
+}
+
+function symbolButton(entry: { node: GraphNode; index: number }, showPath: boolean): string {
+  const { node, index } = entry
+  const meta = showPath ? `<small>${escapeHtml(node.path)}:${node.line}</small>` : ''
+  const search = escapeHtml(`${node.name} ${node.path}`)
+  return `<button type="button" class="spec-${node.spectral}" data-index="${index}" data-search="${search}"><i aria-hidden="true"></i><span><strong>${escapeHtml(node.name)}</strong>${meta}</span></button>`
+}
+
+function symbolTree(entries: Array<{ node: GraphNode; index: number }>): string {
+  const root = treeBranch()
+  for (const entry of entries) {
+    const parts = entry.node.path.split('/').filter(Boolean)
+    const file = parts.pop() ?? entry.node.path
+    let branch = root
+    for (const part of parts) {
+      const next = branch.dirs.get(part) ?? treeBranch()
+      branch.dirs.set(part, next)
+      branch = next
+    }
+    const list = branch.files.get(file) ?? []
+    list.push(entry)
+    branch.files.set(file, list)
+  }
+  return `<div class="tree symbols" id="symbol-tree" hidden>${renderTree(root)}</div>`
+}
+
+function treeBranch(): { dirs: Map<string, ReturnType<typeof treeBranch>>; files: Map<string, Array<{ node: GraphNode; index: number }>> } {
+  return { dirs: new Map(), files: new Map() }
+}
+
+function renderTree(branch: { dirs: Map<string, ReturnType<typeof treeBranch>>; files: Map<string, Array<{ node: GraphNode; index: number }>> }): string {
+  const dirs = [...branch.dirs.entries()].sort(([left], [right]) => left.localeCompare(right))
+  const files = [...branch.files.entries()].sort(([left], [right]) => left.localeCompare(right))
+  const items = [
+    ...dirs.map(([name, child]) => `<li><details open><summary>${escapeHtml(name)}</summary>${renderTree(child)}</details></li>`),
+    ...files.map(([name, group]) => `<li class="tree-file"><span class="tree-file-name">${escapeHtml(name)}</span>${group.map((entry) => symbolButton(entry, false)).join('')}</li>`),
+  ]
+  return `<ul>${items.join('')}</ul>`
 }
 
 function scoreCard(score: ReviewScore): string {
