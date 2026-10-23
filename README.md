@@ -58,6 +58,18 @@ npx --yes astroidal graph --staged
 
 Local branches are read with git. `gh` lists open pull requests and fetches a diff whose branch is not local. `astroidal --help` covers the rest, including `--author`, `--base`, `--unstaged`, and `--repo`.
 
+## Repository
+
+| Path | What it is |
+| --- | --- |
+| `packages/cli` | The published `astroidal` package |
+| `apps/site` | The landing page, a Webstorio site |
+
+```bash
+npm test
+npm run dev:site
+```
+
 ## License
 
 MIT.
