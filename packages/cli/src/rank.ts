@@ -264,6 +264,9 @@ export function assignUnitScores(
   agentScore: number | null,
 ): void {
   const open = new Set(missing);
+  const baseline = graph.baseline
+    ? { median: graph.baseline.blastMedian, branch: graph.baseline.branch }
+    : null;
   for (const unit of graph.units) {
     const files = graph.files.filter((file) => file.units.includes(unit.id));
     const symbols = graph.nodes.filter(
@@ -297,6 +300,13 @@ export function assignUnitScores(
       symbols,
       agentScore,
       covered: required.every((path) => !open.has(path)),
+      baseline: baseline
+        ? {
+            blast: impact.blastRadius,
+            median: baseline.median,
+            branch: baseline.branch,
+          }
+        : null,
     });
   }
 }

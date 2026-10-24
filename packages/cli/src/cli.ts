@@ -161,6 +161,13 @@ export function main(argv: string[]): number {
       symbols: graph.summary.symbols,
       agentScore: ranked.agentScore,
       covered: ranked.covered,
+      baseline: graph.baseline
+        ? {
+            blast: graph.impact.blastRadius,
+            median: graph.baseline.blastMedian,
+            branch: graph.baseline.branch,
+          }
+        : null,
     });
     assignUnitScores(graph, ranked.findings, ranked.missing, ranked.agentScore);
     const directory = join(root, ".astroidal");

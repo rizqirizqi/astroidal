@@ -74,6 +74,12 @@ export interface GraphUnit {
 
 export type Verdict = "passed" | "review" | "fix";
 
+export interface BlastBaseline {
+  branch: string;
+  blastMedian: number;
+  merges: number;
+}
+
 export interface ReviewScore {
   value: number;
   verdict: Verdict;
@@ -166,6 +172,7 @@ export interface Graph {
   repoName: string;
   notes: string[];
   commands: string[];
+  baseline?: BlastBaseline;
   units: GraphUnit[];
   impact: ImpactScores & {
     byUnit: Array<ImpactScores & { unitId: string; label: string }>;

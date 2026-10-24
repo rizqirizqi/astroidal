@@ -1503,6 +1503,61 @@ exit 1
   }
 });
 
+test("the score reason compares blast with recent merges", () => {
+  const calm = {
+    blastRadius: 0,
+    complexityDelta: 0,
+    securityExposure: 0,
+    performanceImpact: 0,
+    blastFiles: 0,
+    complexityRaw: 0,
+    securityLeads: 0,
+    performanceLeads: 0,
+  };
+  const plain = scoreReview({
+    impact: { ...calm, blastRadius: 40 },
+    findings: [],
+    reviewed: true,
+    partial: false,
+    additions: 1,
+    deletions: 0,
+    files: 1,
+    symbols: 0,
+  });
+  const compared = scoreReview({
+    impact: { ...calm, blastRadius: 40 },
+    findings: [],
+    reviewed: true,
+    partial: false,
+    additions: 1,
+    deletions: 0,
+    files: 1,
+    symbols: 0,
+    baseline: { blast: 40, median: 12, branch: "main" },
+  });
+  assert.equal(compared.verdict, plain.verdict);
+  assert.equal(compared.value, plain.value);
+  assert.match(
+    compared.reason,
+    /Blast 40 is above the median 12 of recent merges on main\.$/,
+  );
+  const level = scoreReview({
+    impact: { ...calm, blastRadius: 12 },
+    findings: [],
+    reviewed: true,
+    partial: false,
+    additions: 1,
+    deletions: 0,
+    files: 1,
+    symbols: 0,
+    baseline: { blast: 12, median: 12, branch: "refs/heads/main" },
+  });
+  assert.match(
+    level.reason,
+    /Blast 12 is the median of recent merges on main\.$/,
+  );
+});
+
 test("each pull request keeps its own verdict", () => {
   const calm = {
     blastRadius: 0,
@@ -1635,6 +1690,56 @@ test("the review log matches a later cusp on the same path and symbol", () => {
     const review = readFileSync(join(root, ".astroidal", "review.md"), "utf8");
     assert.match(review, /\| medium \|/);
     assert.doesNotMatch(review, /returned/i);
+  } finally {
+    process.chdir(previous);
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("blast on the default branch is the median of recent merges", () => {
+  const root = mkdtempSync(join(tmpdir(), "astroidal-"));
+  const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
+  git(root, ["init", "-b", "main"]);
+  git(root, ["config", "user.email", "astroidal@example.com"]);
+  git(root, ["config", "user.name", "Astroidal"]);
+  mkdirSync(join(root, "src"));
+  writeFileSync(
+    join(root, "src", "lib.ts"),
+    "export function helper() {\n  return 1\n}\n",
+  );
+  writeFileSync(
+    join(root, "src", "app.ts"),
+    'import { helper } from "./lib"\nexport function start() {\n  return helper()\n}\n',
+  );
+  git(root, ["add", "."]);
+  git(root, ["commit", "-m", "init"]);
+  for (const name of ["f1", "f2"]) {
+    git(root, ["checkout", "-b", name]);
+    writeFileSync(
+      join(root, "src", "lib.ts"),
+      `export function helper() {\n  return ${name === "f1" ? "2" : "3"}\n}\n`,
+    );
+    git(root, ["add", "."]);
+    git(root, ["commit", "-m", name]);
+    git(root, ["checkout", "main"]);
+    git(root, ["merge", "--no-ff", "-m", `merge ${name}`, name]);
+  }
+  writeFileSync(join(root, "notes.md"), "A note about the change.\n");
+  const previous = process.cwd();
+  const previousHome = process.env.HOME;
+  try {
+    process.chdir(root);
+    process.env.HOME = home;
+    const output = captureLog(() => {
+      assert.equal(main(["graph"]), 0);
+    });
+    assert.match(
+      output,
+      /Blast \d+ is under the median \d+ of recent merges on main/,
+    );
   } finally {
     process.chdir(previous);
     if (previousHome === undefined) delete process.env.HOME;

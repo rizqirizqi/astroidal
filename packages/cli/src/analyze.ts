@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { changedLines, countChangedSpan, reconstructSide } from "./diff.js";
 import { githubSlug } from "./forge.js";
+import { blastBaseline } from "./baseline.js";
 import { ghAvailable, tryGh, tryGit } from "./git.js";
 import { isNoise } from "./noise.js";
 import { toPosix } from "./paths.js";
@@ -152,6 +153,7 @@ export function scoreReview(input: {
   symbols: number;
   agentScore?: number | null;
   covered?: boolean;
+  baseline?: { blast: number; median: number; branch: string } | null;
 }): ReviewScore {
   const lines = Math.max(0, input.additions + input.deletions);
   const findingDrag = input.findings.reduce((sum, finding) => {
@@ -200,7 +202,22 @@ export function scoreReview(input: {
     reason =
       "No important findings, and the impact stays under the pass line. The detail does not need another review.";
   }
+  if (input.baseline)
+    reason = `${reason} ${blastComparison(input.baseline.blast, input.baseline.median, input.baseline.branch)}`;
   return { value, verdict, reason, evidence, agentScore };
+}
+
+function blastComparison(
+  blast: number,
+  median: number,
+  branch: string,
+): string {
+  const name = branch.replace(/^refs\/(?:heads|remotes\/origin)\//, "");
+  if (blast > median)
+    return `Blast ${blast} is above the median ${median} of recent merges on ${name}.`;
+  if (blast < median)
+    return `Blast ${blast} is under the median ${median} of recent merges on ${name}.`;
+  return `Blast ${blast} is the median of recent merges on ${name}.`;
 }
 
 export function buildMap(scope: ScopeResult): BuildResult {
@@ -311,6 +328,9 @@ export function buildMap(scope: ScopeResult): BuildResult {
 
   collectCallers(built, index.files, neighbors, neighborSeen);
   const impact = scoreImpact(built, leads, neighbors, scope.units);
+  const baseline = blastBaseline(scope.root, (count) =>
+    exposureScore(count, 16),
+  );
   const tier = riskTier(built);
   const nodes = buildNodes(built, neighbors);
   const edges = buildEdges(built, nodes, neighbors);
@@ -328,6 +348,13 @@ export function buildMap(scope: ScopeResult): BuildResult {
     deletions,
     files: built.length,
     symbols: changedSymbols,
+    baseline: baseline
+      ? {
+          blast: impact.blastRadius,
+          median: baseline.blastMedian,
+          branch: baseline.branch,
+        }
+      : null,
   });
 
   const graph: Graph = {
@@ -336,6 +363,7 @@ export function buildMap(scope: ScopeResult): BuildResult {
     repoName: basename(scope.root),
     notes,
     commands: scope.commands,
+    ...(baseline ? { baseline } : {}),
     units: scope.units.map((unit) => ({
       id: unit.id,
       label: unit.label,
