@@ -179,6 +179,22 @@ export function githubSlug(remote: string): string | null {
   return match?.[1] ?? null;
 }
 
+export function gitlabSlug(remote: string): string | null {
+  const trimmed = remote.trim().replace(/\.git$/, "");
+  const scp = /^(?:[^@/\s]+@)?([^:/\s]+):(.+)$/.exec(trimmed);
+  if (scp?.[1]?.toLowerCase().includes("gitlab") && scp[2])
+    return scp[2].replace(/^\/+/, "");
+  const slash = trimmed.includes("://") ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(slash);
+    if (!url.hostname.toLowerCase().includes("gitlab")) return null;
+    const path = url.pathname.replace(/^\/+|\/+$/g, "");
+    return path.length > 0 ? path : null;
+  } catch {
+    return null;
+  }
+}
+
 function originHost(root: string): string {
   const origin = tryGit(root, ["remote", "get-url", "origin"])?.trim();
   if (origin) return remoteHost(origin);

@@ -12,10 +12,12 @@ function run(
   args: string[],
   cwd: string,
   allowFailure: boolean,
+  input?: string,
 ): string | null {
   const result = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
+    input,
     maxBuffer: 64 * 1024 * 1024,
     env: {
       ...process.env,
@@ -55,6 +57,10 @@ export function gh(cwd: string, args: string[]): string {
   return run("gh", args, cwd, false) ?? "";
 }
 
+export function ghInput(cwd: string, args: string[], input: string): string {
+  return run("gh", args, cwd, false, input) ?? "";
+}
+
 export function tryGh(cwd: string, args: string[]): string | null {
   return run("gh", args, cwd, true);
 }
@@ -65,6 +71,10 @@ export function ghAvailable(): boolean {
 
 export function glab(cwd: string, args: string[]): string {
   return run("glab", args, cwd, false) ?? "";
+}
+
+export function glabInput(cwd: string, args: string[], input: string): string {
+  return run("glab", args, cwd, false, input) ?? "";
 }
 
 export function tryGlab(cwd: string, args: string[]): string | null {

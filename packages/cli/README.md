@@ -35,6 +35,8 @@ Reply with the score, Passed, Review, or Fix first, and the paths to .astroidal/
 
 `rank` exits 1 on Fix first. Passed and Review exit 0. A missing map or findings file still errors.
 
+`comment` writes one comment on the pull request: the score, the verdict, and the cusp paths. It updates that same comment when it runs again. It does not approve, merge, or request reviewers. Pass `--pr` when the map has no pull request, or when it covers more than one.
+
 ## Output
 
 | File                            | What it is                    |

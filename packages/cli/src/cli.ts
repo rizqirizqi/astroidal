@@ -15,6 +15,7 @@ import { renderConstellation } from "./html.js";
 import { installSkill, packageRoot, refreshGlobalSkill } from "./init.js";
 import { writePackets } from "./packets.js";
 import { readRepoFile, resolveScope } from "./scope.js";
+import { postComment } from "./comment.js";
 import { rankFindings, renderReview } from "./rank.js";
 import type { Graph, GraphOptions } from "./types.js";
 
@@ -25,6 +26,7 @@ It does not add itself as a dependency.
   npx --yes astroidal init
   npx --yes astroidal graph
   npx --yes astroidal rank
+  npx --yes astroidal comment
 
 graph
   --pr 12,18          Explicit pull requests. Local branches are diffed with git.
@@ -49,6 +51,14 @@ rank
 
 rank exits 1 on Fix first. Passed and Review exit 0. A missing map or
 findings file still errors.
+
+comment
+  --pr n              Pull request or merge request to update.
+                      Defaults to the one pull request on the map.
+
+comment writes one comment: the score, the verdict, and the cusp paths.
+It updates that comment on the next run. It does not approve, merge,
+or request reviewers.
 
 init
   --force             Replace an installed skill, including local edits.
@@ -166,6 +176,18 @@ export function main(argv: string[]): number {
         .join("\n"),
     );
     return graph.score.verdict === "fix" ? 1 : 0;
+  }
+  if (command === "comment") {
+    const root = repoRoot(start);
+    console.log(
+      [
+        refreshGlobalSkill(),
+        postComment(root, (parsed.flags.get("pr") ?? [])[0]),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+    return 0;
   }
   throw new CommandError(`Unknown command "${command}". Run astroidal --help.`);
 }

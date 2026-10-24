@@ -17,7 +17,7 @@ import { main, parseArgs } from "./cli.js";
 import { countChangedSpan, parseUnifiedDiff } from "./diff.js";
 import { readEvidence, writeEvidence } from "./evidence.js";
 import { writePackets } from "./packets.js";
-import { githubSlug } from "./forge.js";
+import { githubSlug, gitlabSlug } from "./forge.js";
 import { rankFindings } from "./rank.js";
 import { languageFor, parseSyntax } from "./syntax.js";
 import type { Graph } from "./types.js";
@@ -177,6 +177,15 @@ test("github slugs come from github remotes only", () => {
   );
   assert.equal(githubSlug("git@github.com:acme/widgets.git"), "acme/widgets");
   assert.equal(githubSlug("https://gitlab.com/acme/widgets.git"), null);
+  assert.equal(
+    gitlabSlug("https://gitlab.com/acme/widgets.git"),
+    "acme/widgets",
+  );
+  assert.equal(
+    gitlabSlug("git@gitlab.com:acme/group/widgets.git"),
+    "acme/group/widgets",
+  );
+  assert.equal(gitlabSlug("https://github.com/acme/widgets.git"), null);
 });
 
 test("a remote diff uses the commit object when that head is already local", () => {
@@ -1215,6 +1224,186 @@ test("rank exits 1 on Fix first and 0 when a person can still read", () => {
     process.chdir(previous);
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("comment posts one comment and does not approve", () => {
+  const root = makeRepo();
+  const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
+  const bin = join(root, "bin");
+  const log = join(root, "gh.log");
+  const comments = join(root, "comments.json");
+  mkdirSync(bin);
+  writeFileSync(comments, "[]\n");
+  writeFileSync(
+    join(bin, "gh"),
+    `#!/bin/sh
+printf '%s\\n' "$*" >> "$GH_LOG"
+if [ "$1" = "--version" ]; then
+  echo "gh version test"
+  exit 0
+fi
+if [ "$2" = "--paginate" ]; then
+  cat "$GH_COMMENTS"
+  exit 0
+fi
+if [ "$2" = "--method" ]; then
+  cat >> "$GH_LOG"
+  echo '{"id":9}'
+  exit 0
+fi
+echo "unexpected $*" >&2
+exit 1
+`,
+  );
+  chmodSync(join(bin, "gh"), 0o755);
+  git(root, ["remote", "add", "origin", "https://github.com/acme/widgets.git"]);
+  const previous = process.cwd();
+  const previousHome = process.env.HOME;
+  const previousPath = process.env.PATH;
+  const previousLog = process.env.GH_LOG;
+  const previousComments = process.env.GH_COMMENTS;
+  try {
+    process.chdir(root);
+    process.env.HOME = home;
+    process.env.PATH = `${bin}${delimiter}${previousPath ?? ""}`;
+    process.env.GH_LOG = log;
+    process.env.GH_COMMENTS = comments;
+    assert.equal(main(["graph"]), 0);
+    writeFileSync(
+      join(root, ".astroidal", "findings.json"),
+      JSON.stringify({
+        findings: [
+          {
+            severity: "critical",
+            description: "The login query concatenates the password.",
+            path: "src/auth.ts",
+            quote: 'return db.query("SELECT " + password)',
+            recommendation: "Bind the password.",
+          },
+        ],
+        checked: ["src/auth.ts", "src/Login.tsx"],
+      }),
+    );
+    assert.equal(main(["rank"]), 1);
+    assert.throws(() => main(["comment"]), /no pull request/);
+    const posted = captureLog(() => {
+      assert.equal(main(["comment", "--pr", "12"]), 0);
+    });
+    assert.match(posted, /Posted one Astroidal comment on pull request 12/);
+    const calls = readFileSync(log, "utf8");
+    assert.match(
+      calls,
+      /api --method POST --input - repos\/acme\/widgets\/issues\/12\/comments/,
+    );
+    assert.match(calls, /Fix first/);
+    assert.match(calls, /src\/auth\.ts/);
+    assert.doesNotMatch(calls, /pr review|requested_reviewers|\bmerge\b/);
+    writeFileSync(comments, '[{"id":9,"body":"<!-- astroidal -->\\nold"}]\n');
+    writeFileSync(log, "");
+    const updated = captureLog(() => {
+      assert.equal(main(["comment", "--pr", "12"]), 0);
+    });
+    assert.match(updated, /Updated one Astroidal comment on pull request 12/);
+    assert.match(
+      readFileSync(log, "utf8"),
+      /api --method PATCH --input - repos\/acme\/widgets\/issues\/comments\/9/,
+    );
+  } finally {
+    process.chdir(previous);
+    process.env.PATH = previousPath;
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    if (previousLog === undefined) delete process.env.GH_LOG;
+    else process.env.GH_LOG = previousLog;
+    if (previousComments === undefined) delete process.env.GH_COMMENTS;
+    else process.env.GH_COMMENTS = previousComments;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("comment posts one GitLab note", () => {
+  const root = makeRepo();
+  const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
+  const bin = join(root, "bin");
+  const log = join(root, "glab.log");
+  mkdirSync(bin);
+  writeFileSync(
+    join(bin, "glab"),
+    `#!/bin/sh
+printf '%s\\n' "$*" >> "$GLAB_LOG"
+if [ "$1" = "--version" ]; then
+  echo "glab version test"
+  exit 0
+fi
+if [ "$2" = "--paginate" ]; then
+  echo "[]"
+  exit 0
+fi
+if [ "$2" = "--method" ]; then
+  cat >> "$GLAB_LOG"
+  echo '{"id":4}'
+  exit 0
+fi
+echo "unexpected $*" >&2
+exit 1
+`,
+  );
+  chmodSync(join(bin, "glab"), 0o755);
+  git(root, ["remote", "add", "origin", "https://gitlab.com/acme/widgets.git"]);
+  const previous = process.cwd();
+  const previousHome = process.env.HOME;
+  const previousPath = process.env.PATH;
+  const previousLog = process.env.GLAB_LOG;
+  try {
+    process.chdir(root);
+    process.env.HOME = home;
+    process.env.PATH = `${bin}${delimiter}${previousPath ?? ""}`;
+    process.env.GLAB_LOG = log;
+    assert.equal(main(["graph"]), 0);
+    writeFileSync(
+      join(root, ".astroidal", "findings.json"),
+      JSON.stringify({
+        findings: [],
+        checked: ["src/auth.ts", "src/Login.tsx"],
+      }),
+    );
+    assert.equal(main(["rank"]), 0);
+    const graph = JSON.parse(
+      readFileSync(join(root, ".astroidal", "graph.json"), "utf8"),
+    ) as Graph;
+    graph.units = [
+      {
+        id: "pr-3",
+        label: "PR 3",
+        pr: 3,
+        source: "local",
+      },
+    ];
+    writeFileSync(
+      join(root, ".astroidal", "graph.json"),
+      JSON.stringify(graph),
+    );
+    const posted = captureLog(() => {
+      assert.equal(main(["comment"]), 0);
+    });
+    assert.match(posted, /Posted one Astroidal comment on merge request 3/);
+    const calls = readFileSync(log, "utf8");
+    assert.match(
+      calls,
+      /api --method POST --input - projects\/acme%2Fwidgets\/merge_requests\/3\/notes/,
+    );
+    assert.doesNotMatch(calls, /approve|requested_reviewers|\bmerge\b/);
+  } finally {
+    process.chdir(previous);
+    process.env.PATH = previousPath;
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    if (previousLog === undefined) delete process.env.GLAB_LOG;
+    else process.env.GLAB_LOG = previousLog;
     rmSync(root, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
   }

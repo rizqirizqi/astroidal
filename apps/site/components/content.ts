@@ -82,6 +82,11 @@ export const QUESTIONS = [
       "A cyan circle is logic. A violet diamond is a contract. A square is text. A ring is an orbit neighbor. A cloud is a directory. A violet dashed cloud is a group named in the review. A line is an import or a call.",
   },
   {
+    question: "What does a pull request show?",
+    answer:
+      "comment writes one pull request comment with the score, the verdict, and the cusp paths. It does not approve, merge, or request reviewers. The map stays at .astroidal/constellation.html.",
+  },
+  {
     question: "Where is the source, and what license is it?",
     answer:
       "The source is on GitHub and the license is MIT. Questions and bugs go to the issue tracker. This page is the map’s front door, not a second manual.",
