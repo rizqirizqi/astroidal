@@ -33,6 +33,8 @@ Reply with the score, Passed, Review, or Fix first, and the paths to .astroidal/
 
 `init` installs the skill into `.agents/skills/astroidal/` and `.cursor/skills/astroidal/`, and ignores `.astroidal/`. `init --global` installs it for every repository. `init --force` replaces a skill you edited. A newer Astroidal refreshes an unmodified global skill on `graph` or `rank`.
 
+`rank` exits 1 on Fix first. Passed and Review exit 0. A missing map or findings file still errors.
+
 ## Output
 
 | File                            | What it is                    |

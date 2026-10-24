@@ -655,7 +655,7 @@ test("graph and rank review a worktree without adding a dependency", () => {
         ],
       }),
     );
-    assert.equal(main(["rank"]), 0);
+    assert.equal(main(["rank"]), 1);
     const review = readFileSync(join(root, ".astroidal", "review.md"), "utf8");
     assert.match(
       review,
@@ -1168,6 +1168,49 @@ test("graph refreshes an unmodified global skill and leaves edits and project co
     );
     assert.equal(stampVersion(projectSkill), "0.0.1");
     assert.equal(stampVersion(agentsSkill), "9.0.0");
+  } finally {
+    process.chdir(previous);
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("rank exits 1 on Fix first and 0 when a person can still read", () => {
+  const root = makeRepo();
+  const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
+  const previous = process.cwd();
+  const previousHome = process.env.HOME;
+  try {
+    process.chdir(root);
+    process.env.HOME = home;
+    assert.equal(main(["graph"]), 0);
+    writeFileSync(
+      join(root, ".astroidal", "findings.json"),
+      JSON.stringify({
+        findings: [
+          {
+            severity: "critical",
+            description: "The login query concatenates the password.",
+            path: "src/auth.ts",
+            quote: 'return db.query("SELECT " + password)',
+            recommendation: "Bind the password.",
+          },
+        ],
+        checked: ["src/auth.ts", "src/Login.tsx"],
+      }),
+    );
+    assert.equal(main(["rank"]), 1);
+    writeFileSync(
+      join(root, ".astroidal", "findings.json"),
+      JSON.stringify({
+        findings: [],
+        checked: ["src/auth.ts", "src/Login.tsx"],
+        agentScore: 100,
+      }),
+    );
+    assert.equal(main(["rank"]), 0);
   } finally {
     process.chdir(previous);
     if (previousHome === undefined) delete process.env.HOME;

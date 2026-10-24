@@ -47,6 +47,9 @@ that host is listed in the glab config.
 rank
   --findings file     Defaults to .astroidal/findings.json
 
+rank exits 1 on Fix first. Passed and Review exit 0. A missing map or
+findings file still errors.
+
 init
   --force             Replace an installed skill, including local edits.
   --global            Install for every repository, under the home directory.
@@ -162,7 +165,7 @@ export function main(argv: string[]): number {
         .filter(Boolean)
         .join("\n"),
     );
-    return 0;
+    return graph.score.verdict === "fix" ? 1 : 0;
   }
   throw new CommandError(`Unknown command "${command}". Run astroidal --help.`);
 }
