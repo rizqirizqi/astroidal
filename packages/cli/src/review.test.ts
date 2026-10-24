@@ -601,6 +601,22 @@ test("graph and rank review a worktree without adding a dependency", () => {
     process.chdir(root);
     process.env.HOME = home;
     assert.equal(main(["init"]), 0);
+    assert.equal(
+      existsSync(join(root, ".agents", "skills", "astroidal", "SKILL.md")),
+      true,
+    );
+    assert.equal(
+      existsSync(join(root, ".claude", "skills", "astroidal", "SKILL.md")),
+      false,
+    );
+    assert.equal(
+      existsSync(join(root, ".cursor", "skills", "astroidal", "SKILL.md")),
+      false,
+    );
+    assert.equal(
+      existsSync(join(root, ".github", "skills", "astroidal", "SKILL.md")),
+      false,
+    );
     assert.equal(main(["graph"]), 0);
     const graph = JSON.parse(
       readFileSync(join(root, ".astroidal", "graph.json"), "utf8"),
@@ -623,13 +639,13 @@ test("graph and rank review a worktree without adding a dependency", () => {
       false,
     );
     assert.ok(
-      existsSync(join(root, ".cursor", "skills", "astroidal", "SKILL.md")),
+      existsSync(join(root, ".agents", "skills", "astroidal", "SKILL.md")),
     );
     assert.match(
       readFileSync(
         join(
           root,
-          ".cursor",
+          ".agents",
           "skills",
           "astroidal",
           "references",
@@ -715,13 +731,6 @@ test("init --global installs the skill under the home directory", () => {
     process.chdir(root);
     process.env.HOME = home;
     assert.equal(main(["init", "--global"]), 0);
-    const cursorSkill = join(
-      home,
-      ".cursor",
-      "skills",
-      "astroidal",
-      "SKILL.md",
-    );
     const agentsSkill = join(
       home,
       ".agents",
@@ -729,21 +738,18 @@ test("init --global installs the skill under the home directory", () => {
       "astroidal",
       "SKILL.md",
     );
-    assert.match(readFileSync(cursorSkill, "utf8"), /name: astroidal/);
     assert.match(readFileSync(agentsSkill, "utf8"), /name: astroidal/);
-    assert.match(
-      readFileSync(
-        join(
-          home,
-          ".cursor",
-          "skills",
-          "astroidal",
-          "references",
-          "review-lenses.md",
-        ),
-        "utf8",
-      ),
-      /Review lenses/,
+    assert.equal(
+      existsSync(join(home, ".cursor", "skills", "astroidal", "SKILL.md")),
+      false,
+    );
+    assert.equal(
+      existsSync(join(home, ".claude", "skills", "astroidal", "SKILL.md")),
+      false,
+    );
+    assert.equal(
+      existsSync(join(home, ".copilot", "skills", "astroidal", "SKILL.md")),
+      false,
     );
     assert.match(
       readFileSync(
@@ -772,11 +778,99 @@ test("init --global installs the skill under the home directory", () => {
       false,
     );
     assert.equal(readFileSync(join(home, ".gitignore"), "utf8"), "keep\n");
-    writeFileSync(cursorSkill, "custom\n");
+    writeFileSync(agentsSkill, "custom\n");
     assert.equal(main(["init", "--global"]), 0);
-    assert.equal(readFileSync(cursorSkill, "utf8"), "custom\n");
+    assert.equal(readFileSync(agentsSkill, "utf8"), "custom\n");
     assert.equal(main(["init", "--global", "--force"]), 0);
-    assert.match(readFileSync(cursorSkill, "utf8"), /name: astroidal/);
+    assert.match(readFileSync(agentsSkill, "utf8"), /name: astroidal/);
+  } finally {
+    process.chdir(previous);
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("init --agent copies the same skill into that agent's directory", () => {
+  const root = makeRepo();
+  const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
+  const previous = process.cwd();
+  const previousHome = process.env.HOME;
+  try {
+    process.chdir(root);
+    process.env.HOME = home;
+    assert.throws(
+      () => main(["init", "--agent", "windsurf"]),
+      /Unknown agent "windsurf"/,
+    );
+    assert.equal(main(["init", "--agent", "cursor,claude"]), 0);
+    assert.equal(
+      existsSync(join(root, ".cursor", "skills", "astroidal", "SKILL.md")),
+      true,
+    );
+    assert.equal(
+      existsSync(join(root, ".claude", "skills", "astroidal", "SKILL.md")),
+      true,
+    );
+    assert.equal(
+      existsSync(join(root, ".agents", "skills", "astroidal", "SKILL.md")),
+      false,
+    );
+    assert.equal(main(["init", "--agent", "copilot", "--global"]), 0);
+    assert.equal(
+      existsSync(join(home, ".copilot", "skills", "astroidal", "SKILL.md")),
+      true,
+    );
+    assert.equal(
+      existsSync(join(home, ".github", "skills", "astroidal", "SKILL.md")),
+      false,
+    );
+    assert.equal(main(["init", "--agent", "codex"]), 0);
+    const lens = readFileSync(
+      join(
+        root,
+        ".agents",
+        "skills",
+        "astroidal",
+        "references",
+        "review-lenses.md",
+      ),
+      "utf8",
+    );
+    assert.equal(
+      readFileSync(
+        join(
+          root,
+          ".cursor",
+          "skills",
+          "astroidal",
+          "references",
+          "review-lenses.md",
+        ),
+        "utf8",
+      ),
+      lens,
+    );
+    assert.equal(main(["init", "--agent", "all"]), 0);
+    assert.equal(
+      existsSync(join(root, ".github", "skills", "astroidal", "SKILL.md")),
+      true,
+    );
+    assert.equal(
+      readFileSync(
+        join(
+          root,
+          ".github",
+          "skills",
+          "astroidal",
+          "references",
+          "review-lenses.md",
+        ),
+        "utf8",
+      ),
+      lens,
+    );
   } finally {
     process.chdir(previous);
     if (previousHome === undefined) delete process.env.HOME;
@@ -1103,8 +1197,8 @@ test("graph refreshes an unmodified global skill and leaves edits and project co
   try {
     process.chdir(root);
     process.env.HOME = home;
-    assert.equal(main(["init"]), 0);
-    assert.equal(main(["init", "--global"]), 0);
+    assert.equal(main(["init", "--agent", "all"]), 0);
+    assert.equal(main(["init", "--global", "--agent", "all"]), 0);
     const projectSkill = join(root, ".cursor", "skills", "astroidal");
     const globalSkill = join(home, ".cursor", "skills", "astroidal");
     const agentsSkill = join(home, ".agents", "skills", "astroidal");
@@ -1132,7 +1226,7 @@ test("graph refreshes an unmodified global skill and leaves edits and project co
     );
     assert.equal(stampVersion(globalSkill), "0.0.1");
 
-    assert.equal(main(["init", "--global", "--force"]), 0);
+    assert.equal(main(["init", "--global", "--agent", "all", "--force"]), 0);
     rmSync(join(globalSkill, ".install.json"));
     rmSync(join(agentsSkill, ".install.json"));
     const adopted = captureLog(() => {
@@ -1164,7 +1258,7 @@ test("graph refreshes an unmodified global skill and leaves edits and project co
 
     rmSync(join(globalSkill, "references", "review-lenses.md"));
     const repaired = captureLog(() => {
-      assert.equal(main(["init", "--global"]), 0);
+      assert.equal(main(["init", "--global", "--agent", "cursor"]), 0);
     });
     assert.match(repaired, /init --force/);
     assert.equal(

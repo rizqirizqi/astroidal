@@ -61,9 +61,13 @@ It updates that comment on the next run. It does not approve, merge,
 or request reviewers.
 
 init
+  --agent name        agents, claude, codex, copilot, cursor, or all.
+                      Repeatable. Default: agents (.agents/skills).
   --force             Replace an installed skill, including local edits.
   --global            Install for every repository, under the home directory.
 
+Codex reads the default .agents/skills copy. --agent copilot uses
+.github/skills in a repo and ~/.copilot/skills for --global.
 graph and rank update an unmodified global skill when this package is newer.
 `;
 
@@ -89,6 +93,7 @@ export function main(argv: string[]): number {
       start,
       enabled(parsed.flags, "force"),
       enabled(parsed.flags, "global"),
+      parsed.flags.get("agent"),
     );
     console.log(
       [

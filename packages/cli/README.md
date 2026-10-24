@@ -31,7 +31,7 @@ npx --yes astroidal rank
 Reply with the score, Passed, Review, or Fix first, and the paths to .astroidal/review.md and .astroidal/constellation.html.
 ```
 
-`init` installs the skill into `.agents/skills/astroidal/` and `.cursor/skills/astroidal/`, and ignores `.astroidal/`. `init --global` installs it for every repository. `init --force` replaces a skill you edited. A newer Astroidal refreshes an unmodified global skill on `graph` or `rank`.
+`init` installs the skill into `.agents/skills/astroidal/` and ignores `.astroidal/`. Codex reads that directory. Pass `--agent cursor`, `--agent claude`, or `--agent copilot` to copy the same skill into that agent's directory (`.cursor/skills`, `.claude/skills`, or `.github/skills`). `--agent all` installs each of them. `init --global` installs for every repository; a global Copilot copy is `~/.copilot/skills/astroidal/`. `init --force` replaces a skill you edited. A newer Astroidal refreshes an unmodified global skill on `graph` or `rank`.
 
 `rank` exits 1 on Fix first. Passed and Review exit 0. A missing map or findings file still errors.
 

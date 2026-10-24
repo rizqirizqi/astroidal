@@ -59,7 +59,7 @@ export const QUESTIONS = [
   {
     question: "Does Astroidal get added to the project?",
     answer:
-      "No. Run it with npx. init installs the skill for the agent and gitignores .astroidal. It does not edit package.json, a lockfile, or a module manifest.",
+      "No. Run it with npx. init installs the skill into .agents/skills and gitignores .astroidal. Pass --agent cursor, claude, codex, or copilot to copy that same skill for one agent. It does not edit package.json, a lockfile, or a module manifest.",
   },
   {
     question: "Who looks for the bugs?",

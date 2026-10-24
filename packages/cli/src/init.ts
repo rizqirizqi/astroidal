@@ -11,12 +11,29 @@ import {
 import { homedir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tryGit } from "./git.js";
+import { CommandError, tryGit } from "./git.js";
 
 const STAMP = ".install.json";
-const SKILL_DIRS = [
-  join(".agents", "skills", "astroidal"),
-  join(".cursor", "skills", "astroidal"),
+const SKILL_TAIL = join("skills", "astroidal");
+type SkillTarget = "agents" | "claude" | "copilot" | "cursor";
+
+const PROJECT_DIRS: Record<SkillTarget, string> = {
+  agents: join(".agents", SKILL_TAIL),
+  claude: join(".claude", SKILL_TAIL),
+  copilot: join(".github", SKILL_TAIL),
+  cursor: join(".cursor", SKILL_TAIL),
+};
+const GLOBAL_DIRS: Record<SkillTarget, string> = {
+  agents: join(".agents", SKILL_TAIL),
+  claude: join(".claude", SKILL_TAIL),
+  copilot: join(".copilot", SKILL_TAIL),
+  cursor: join(".cursor", SKILL_TAIL),
+};
+const REFRESH_TARGETS: SkillTarget[] = [
+  "agents",
+  "claude",
+  "copilot",
+  "cursor",
 ];
 
 interface SkillStamp {
@@ -40,6 +57,7 @@ export function installSkill(
   start: string,
   force: boolean,
   global = false,
+  agents?: string[],
 ): string[] {
   const root = global
     ? homedir()
@@ -47,7 +65,7 @@ export function installSkill(
   const sourceDir = skillSource();
   const notes: string[] = [];
   let edited = false;
-  for (const destination of destinations(root)) {
+  for (const destination of destinations(root, global, resolveAgents(agents))) {
     const result = installInto(destination, sourceDir, force);
     notes.push(...result.notes);
     edited = edited || result.edited;
@@ -66,7 +84,7 @@ export function refreshGlobalSkill(): string | null {
   const version = packageVersion();
   let updatedFrom: string | null = null;
   let blocked = false;
-  for (const destination of destinations(homedir())) {
+  for (const destination of destinations(homedir(), true, REFRESH_TARGETS)) {
     if (!existsSync(join(destination, "SKILL.md"))) continue;
     const stamp = readStamp(destination);
     if (stamp && isManaged(destination, stamp)) {
@@ -169,8 +187,49 @@ function publish(
   writeStamp(destination, sourceDir);
 }
 
-function destinations(root: string): string[] {
-  return SKILL_DIRS.map((path) => join(root, path));
+function resolveAgents(agents: string[] | undefined): SkillTarget[] {
+  const requested = (agents ?? [])
+    .flatMap((agent) => agent.split(","))
+    .map((agent) => agent.trim().toLowerCase())
+    .filter((agent) => agent.length > 0);
+  if (requested.length === 0) return ["agents"];
+  if (requested.some((agent) => agent === "true"))
+    throw new CommandError(
+      "Pass an agent name to --agent: agents, claude, codex, copilot, cursor, or all.",
+    );
+  if (requested.includes("all")) return [...REFRESH_TARGETS];
+  const targets: SkillTarget[] = [];
+  for (const agent of requested) {
+    const target = targetFor(agent);
+    if (!targets.includes(target)) targets.push(target);
+  }
+  return targets;
+}
+
+function targetFor(agent: string): SkillTarget {
+  if (agent === "agents" || agent === "codex") return "agents";
+  if (agent === "claude" || agent === "copilot" || agent === "cursor")
+    return agent;
+  throw new CommandError(
+    `Unknown agent "${agent}". Use agents, claude, codex, copilot, cursor, or all.`,
+  );
+}
+
+function destinations(
+  root: string,
+  global: boolean,
+  targets: SkillTarget[],
+): string[] {
+  const dirs = global ? GLOBAL_DIRS : PROJECT_DIRS;
+  const seen = new Set<string>();
+  const paths: string[] = [];
+  for (const target of targets) {
+    const path = join(root, dirs[target]);
+    if (seen.has(path)) continue;
+    seen.add(path);
+    paths.push(path);
+  }
+  return paths;
 }
 
 function skillSource(): string {

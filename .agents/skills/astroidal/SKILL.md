@@ -25,13 +25,23 @@ Resolve the command in this order:
 
 If the package name cannot be downloaded, and the user pointed at a local checkout, run `npx --yes <path-to-the-astroidal-package>` or `node <path>/dist/cli.js`.
 
-Install the skill once per repository:
+Install the skill once per repository. This writes `.agents/skills/astroidal`, which Codex and other agents read:
 
 ```bash
 npx --yes astroidal init
 ```
 
-Pass `--global` to install it once for every repository on this machine:
+Pass `--agent` to copy that same skill into one agent's own directory. Repeat it, or pass `all`.
+
+```bash
+npx --yes astroidal init --agent cursor
+npx --yes astroidal init --agent claude
+npx --yes astroidal init --agent copilot
+```
+
+`--agent cursor` writes `.cursor/skills/astroidal`. `--agent claude` writes `.claude/skills/astroidal`. `--agent copilot` writes `.github/skills/astroidal`. `--agent codex` is the default `.agents/skills/astroidal` directory.
+
+Pass `--global` to install it once for every repository on this machine. A global Copilot copy is `~/.copilot/skills/astroidal`.
 
 ```bash
 npx --yes astroidal init --global
