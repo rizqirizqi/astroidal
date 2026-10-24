@@ -342,6 +342,43 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
   });
   assert.equal(broken.verdict, "fix");
   assert.ok(broken.value < 80);
+  const unsure = scoreReview({
+    impact: calm,
+    findings: [{ severity: "critical", agentScore: 0 }],
+    reviewed: true,
+    partial: false,
+    additions: 1,
+    deletions: 0,
+    files: 1,
+    symbols: 0,
+  });
+  const certain = scoreReview({
+    impact: calm,
+    findings: [{ severity: "critical", agentScore: 100 }],
+    reviewed: true,
+    partial: false,
+    additions: 1,
+    deletions: 0,
+    files: 1,
+    symbols: 0,
+  });
+  assert.equal(unsure.verdict, "fix");
+  assert.equal(certain.verdict, "fix");
+  assert.ok(unsure.value > certain.value);
+  const worried = scoreReview({
+    impact: calm,
+    findings: [],
+    reviewed: true,
+    partial: false,
+    additions: 4,
+    deletions: 0,
+    files: 1,
+    symbols: 0,
+    agentScore: 0,
+  });
+  assert.equal(worried.evidence, 99);
+  assert.equal(worried.value, 79);
+  assert.equal(worried.verdict, "review");
 });
 
 test("a stacked remote diff keeps the child body and every added line", () => {
@@ -586,7 +623,7 @@ test("graph and rank review a worktree without adding a dependency", () => {
     const review = readFileSync(join(root, ".astroidal", "review.md"), "utf8");
     assert.match(
       review,
-      /\| ID \| Severity \| Issue Description \| File Path \| Recommendation \| PR \|/,
+      /\| ID \| Severity \| Agent \| Issue Description \| File Path \| Recommendation \| PR \|/,
     );
     assert.match(review, /A-001/);
     assert.match(review, /src\/auth\.ts/);

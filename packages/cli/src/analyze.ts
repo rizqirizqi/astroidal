@@ -124,32 +124,39 @@ export function exposureScore(count: number, slope: number): number {
 
 const PASS_LINE = 80;
 
+const SEVERITY_DRAG: Record<Severity, number> = {
+  critical: 0.95,
+  high: 0.48,
+  medium: 0.24,
+};
+
 export function verdictLabel(verdict: Verdict): string {
   if (verdict === "passed") return "Passed";
   if (verdict === "review") return "Review";
   return "Fix first";
 }
 
+export function clampAgentScore(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 export function scoreReview(input: {
   impact: ImpactScores;
-  findings: Array<{ severity: Severity }>;
+  findings: Array<{ severity: Severity; agentScore?: number | null }>;
   reviewed: boolean;
   partial: boolean;
   additions: number;
   deletions: number;
   files: number;
   symbols: number;
+  agentScore?: number | null;
 }): ReviewScore {
-  const critical = input.findings.filter(
-    (finding) => finding.severity === "critical",
-  ).length;
-  const high = input.findings.filter(
-    (finding) => finding.severity === "high",
-  ).length;
-  const medium = input.findings.filter(
-    (finding) => finding.severity === "medium",
-  ).length;
   const lines = Math.max(0, input.additions + input.deletions);
+  const findingDrag = input.findings.reduce((sum, finding) => {
+    const confidence = (finding.agentScore ?? 100) / 100;
+    return sum + SEVERITY_DRAG[finding.severity] * (0.5 + 0.5 * confidence);
+  }, 0);
   const drag =
     Math.sqrt(lines) * 0.003 +
     Math.sqrt(Math.max(input.files - 1, 0)) * 0.035 +
@@ -158,13 +165,22 @@ export function scoreReview(input: {
     (input.impact.complexityDelta / 100) * 0.28 +
     (input.impact.securityExposure / 100) * 0.62 +
     (input.impact.performanceImpact / 100) * 0.22 +
-    critical * 0.95 +
-    high * 0.48 +
-    medium * 0.24 +
+    findingDrag +
     (input.partial ? 0.05 : 0) +
     (input.reviewed ? 0 : 0.42);
-  const value = Math.max(0, Math.min(100, Math.round(100 * Math.exp(-drag))));
-  const clean = critical + high + medium === 0;
+  const evidence = Math.max(
+    0,
+    Math.min(100, Math.round(100 * Math.exp(-drag))),
+  );
+  const agentScore = clampAgentScore(input.agentScore);
+  const value =
+    agentScore == null
+      ? evidence
+      : Math.max(
+          0,
+          Math.min(100, Math.round(0.8 * evidence + 0.2 * agentScore)),
+        );
+  const clean = input.findings.length === 0;
   let verdict: Verdict = "fix";
   let reason = "Fix the cusp alerts before this passes.";
   if (!input.reviewed) reason = "Rank the findings before this can pass.";
@@ -178,7 +194,7 @@ export function scoreReview(input: {
     reason =
       "No important findings, and the impact stays under the pass line. The detail does not need another review.";
   }
-  return { value, verdict, reason };
+  return { value, verdict, reason, evidence, agentScore };
 }
 
 export function buildMap(scope: ScopeResult): BuildResult {

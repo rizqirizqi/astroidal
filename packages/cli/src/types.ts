@@ -77,6 +77,8 @@ export interface ReviewScore {
   value: number;
   verdict: Verdict;
   reason: string;
+  evidence: number;
+  agentScore: number | null;
 }
 
 export interface ImpactScores {
@@ -148,6 +150,7 @@ export interface RankedFinding {
   id: string;
   pr: string;
   severity: Severity;
+  agentScore: number | null;
   description: string;
   path: string;
   line: number | null;

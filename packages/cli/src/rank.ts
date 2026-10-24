@@ -49,12 +49,14 @@ interface RawFinding {
   quote?: string;
   recommendation?: string;
   category?: string;
+  agentScore?: number;
 }
 
 export interface RankResult {
   findings: RankedFinding[];
   dropped: DroppedFinding[];
   groups: ReviewGroup[];
+  agentScore: number | null;
 }
 
 export function rankFindings(
@@ -143,6 +145,7 @@ export function rankFindings(
       id: "",
       pr: prLabel(item.pr, path, graph),
       severity,
+      agentScore: clampScore(item.agentScore),
       description,
       path,
       line: found,
@@ -165,6 +168,7 @@ export function rankFindings(
       previous.severity = finding.severity;
       previous.recommendation = finding.recommendation;
       previous.line = finding.line;
+      previous.agentScore = finding.agentScore;
     }
     dropped.push({
       description: finding.description,
@@ -182,7 +186,12 @@ export function rankFindings(
   deduped.forEach((finding, index) => {
     finding.id = `A-${String(index + 1).padStart(3, "0")}`;
   });
-  return { findings: deduped, dropped, groups: readGroups(input, graph) };
+  return {
+    findings: deduped,
+    dropped,
+    groups: readGroups(input, graph),
+    agentScore: readAgentScore(input),
+  };
 }
 
 export function renderReview(graph: Graph, result: RankResult): string {
@@ -198,19 +207,22 @@ export function renderReview(graph: Graph, result: RankResult): string {
     ...(graph.score
       ? [
           `Score: ${graph.score.value} · ${verdictLabel(graph.score.verdict)}. ${graph.score.reason}`,
+          ...(graph.score.agentScore == null
+            ? []
+            : [`Agent score: ${graph.score.agentScore}`]),
           "",
         ]
       : []),
     "Chart: `.astroidal/constellation.html`",
     "",
-    "| ID | Severity | Issue Description | File Path | Recommendation | PR |",
-    "| --- | --- | --- | --- | --- | --- |",
+    "| ID | Severity | Agent | Issue Description | File Path | Recommendation | PR |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
   ];
   if (result.findings.length === 0)
-    lines.push("| | | No confirmed findings. | | | |");
+    lines.push("| | | | No confirmed findings. | | | |");
   for (const finding of result.findings) {
     lines.push(
-      `| ${cell(finding.id)} | ${cell(finding.severity)} | ${cell(finding.description)} | ${cell(formatPath(finding))} | ${cell(finding.recommendation)} | ${cell(finding.pr)} |`,
+      `| ${cell(finding.id)} | ${cell(finding.severity)} | ${cell(finding.agentScore == null ? "" : String(finding.agentScore))} | ${cell(finding.description)} | ${cell(formatPath(finding))} | ${cell(finding.recommendation)} | ${cell(finding.pr)} |`,
     );
   }
   lines.push("");
@@ -255,6 +267,17 @@ function readGroups(input: unknown, graph: Graph): ReviewGroup[] {
     if (groups.length >= 12) break;
   }
   return groups;
+}
+
+function clampScore(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function readAgentScore(input: unknown): number | null {
+  if (typeof input !== "object" || input === null || !("agentScore" in input))
+    return null;
+  return clampScore(input.agentScore);
 }
 
 function unwrap(input: unknown): RawFinding[] {

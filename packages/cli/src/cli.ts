@@ -140,6 +140,7 @@ export function main(argv: string[]): number {
       deletions: graph.summary.deletions,
       files: graph.summary.files,
       symbols: graph.summary.symbols,
+      agentScore: ranked.agentScore,
     });
     const directory = join(root, ".astroidal");
     writeFileSync(

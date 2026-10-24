@@ -22,7 +22,7 @@ export function renderConstellation(graph: Graph): string {
   const alerts =
     graph.findings.length === 0
       ? '<p class="quiet">No cusp alerts on this map.</p>'
-      : `<ol class="alerts">${graph.findings.map((finding) => `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em> ${escapeHtml(finding.description)}<button type="button" class="alert-path" data-alert-path="${escapeHtml(finding.path)}" data-alert-line="${finding.line ?? ""}" aria-label="Open ${escapeHtml(finding.path)} in the lens">${escapeHtml(finding.path)}${finding.line == null ? "" : `:${finding.line}`}</button></li>`).join("")}</ol>`;
+      : `<ol class="alerts">${graph.findings.map((finding) => `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em>${finding.agentScore == null ? "" : ` <span class="agent-score">agent ${finding.agentScore}</span>`} ${escapeHtml(finding.description)}<button type="button" class="alert-path" data-alert-path="${escapeHtml(finding.path)}" data-alert-line="${finding.line ?? ""}" aria-label="Open ${escapeHtml(finding.path)} in the lens">${escapeHtml(finding.path)}${finding.line == null ? "" : `:${finding.line}`}</button></li>`).join("")}</ol>`;
   const unitScores =
     graph.impact.byUnit.length > 1
       ? `<details class="unit-fold"><summary>${graph.impact.byUnit.length} pull requests</summary><ul class="units">${graph.impact.byUnit.map((unit) => `<li><span>${escapeHtml(unit.label)}</span><em>blast ${unit.blastRadius} · complexity ${signed(unit.complexityRaw)} · security ${unit.securityExposure} · perf ${unit.performanceImpact}</em></li>`).join("")}</ul></details>`
@@ -138,6 +138,7 @@ export function renderConstellation(graph: Graph): string {
     .verdict-fix .verdict-row b, .verdict-fix .verdict-label { color: var(--amber); }
     .verdict-passed .verdict-row b, .verdict-passed .verdict-label { color: var(--cyan); }
     .verdict-review .verdict-row b, .verdict-review .verdict-label { color: var(--violet-ink); }
+    .agent-score { color: var(--violet-ink); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
     .verdict .quiet { margin: 0; font-size: 13px; }
     .legend, .units, .alerts { list-style: none; padding: 0; margin: 0 0 16px; }
     .surface { width: 100%; height: auto; display: block; margin: 0 0 4px; }
@@ -392,7 +393,11 @@ function renderTree(branch: {
 
 function scoreCard(score: ReviewScore): string {
   const label = verdictLabel(score.verdict);
-  return `<section class="verdict verdict-${score.verdict}" aria-label="Astroidal score ${score.value}, ${label}"><p class="eyebrow">Astroidal score</p><p class="verdict-row"><b>${score.value}</b><span class="verdict-label">${label}</span></p><p class="quiet">${escapeHtml(score.reason)}</p></section>`;
+  const agent =
+    score.agentScore == null
+      ? ""
+      : `<p class="quiet">Agent score ${score.agentScore}</p>`;
+  return `<section class="verdict verdict-${score.verdict}" aria-label="Astroidal score ${score.value}, ${label}"><p class="eyebrow">Astroidal score</p><p class="verdict-row"><b>${score.value}</b><span class="verdict-label">${label}</span></p><p class="quiet">${escapeHtml(score.reason)}</p>${agent}</section>`;
 }
 
 function impactSurface(impact: Graph["impact"]): string {
