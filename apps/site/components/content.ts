@@ -69,7 +69,7 @@ export const QUESTIONS = [
   {
     question: "What does Passed, Review, or Fix first mean?",
     answer:
-      "Passed means rank found no cusp and the score is at least 80, so a person can skip the detail. Review means there is no cusp and a person still reads the change, because the impact is high. Fix first means rank kept a finding that quotes a real line.",
+      "Passed means rank found no cusp, every added block was checked, and the score is at least 80, so a person can skip the detail. Review means there is no cusp and a person still reads the change, because the impact is high or a block was not checked. Fix first means rank kept a finding that quotes a real line.",
   },
   {
     question: "What can one map cover?",

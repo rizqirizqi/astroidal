@@ -1,4 +1,5 @@
 import { verdictLabel } from "./analyze.js";
+import { isSourcePath } from "./syntax.js";
 import type {
   DroppedFinding,
   Graph,
@@ -57,6 +58,8 @@ export interface RankResult {
   dropped: DroppedFinding[];
   groups: ReviewGroup[];
   agentScore: number | null;
+  covered: boolean;
+  missing: string[];
 }
 
 export function rankFindings(
@@ -186,11 +189,16 @@ export function rankFindings(
   deduped.forEach((finding, index) => {
     finding.id = `A-${String(index + 1).padStart(3, "0")}`;
   });
+  const required = huntPaths(graph);
+  const checked = readChecked(input);
+  const missing = required.filter((path) => !checked.has(path));
   return {
     findings: deduped,
     dropped,
     groups: readGroups(input, graph),
     agentScore: readAgentScore(input),
+    covered: missing.length === 0,
+    missing,
   };
 }
 
@@ -215,9 +223,17 @@ export function renderReview(graph: Graph, result: RankResult): string {
       : []),
     "Chart: `.astroidal/constellation.html`",
     "",
+  ];
+  if (result.missing.length > 0) {
+    lines.push(
+      `Still open: ${result.missing.map((path) => `\`${path}\``).join(", ")}`,
+      "",
+    );
+  }
+  lines.push(
     "| ID | Severity | Agent | Issue Description | File Path | Recommendation | PR |",
     "| --- | --- | --- | --- | --- | --- | --- |",
-  ];
+  );
   if (result.findings.length === 0)
     lines.push("| | | | No confirmed findings. | | | |");
   for (const finding of result.findings) {
@@ -278,6 +294,36 @@ function readAgentScore(input: unknown): number | null {
   if (typeof input !== "object" || input === null || !("agentScore" in input))
     return null;
   return clampScore(input.agentScore);
+}
+
+function readChecked(input: unknown): Set<string> {
+  if (typeof input !== "object" || input === null || !("checked" in input))
+    return new Set();
+  const raw = input.checked;
+  if (!Array.isArray(raw)) return new Set();
+  return new Set(
+    raw
+      .filter((item): item is string => typeof item === "string")
+      .map(normalizePath),
+  );
+}
+
+function huntPaths(graph: Graph): string[] {
+  return graph.files
+    .filter(
+      (file) =>
+        file.additions > 0 && isSourcePath(file.path) && !isTestPath(file.path),
+    )
+    .map((file) => file.path);
+}
+
+function isTestPath(path: string): boolean {
+  const posix = path.replaceAll("\\", "/");
+  return (
+    /(^|\/)(__tests__|tests?|spec)(\/|$)/.test(posix) ||
+    /\.(test|spec)\.[^.]+$/.test(posix) ||
+    /_(test|spec)\./.test(posix)
+  );
 }
 
 function unwrap(input: unknown): RawFinding[] {

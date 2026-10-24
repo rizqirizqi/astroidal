@@ -109,6 +109,7 @@ Write `.astroidal/findings.json`:
 ```json
 {
   "agentScore": 88,
+  "checked": ["src/auth.ts"],
   "findings": [
     {
       "pr": 12,
@@ -127,7 +128,7 @@ Write `.astroidal/findings.json`:
 
 `severity` is `critical`, `high`, or `medium`, using the gate in the catalog. `critical` is a crash, data loss, authz bypass, injection, or secret exposure on a path users hit. `high` is a realistic wrong result, lost write, race, or broken contract. `medium` is a realistic edge that fails. `quote` is one exact line copied from an added-lines block, the mapped file, or its one-hop neighbor. Set `pr` to the pull request that introduced that line, or omit it for a local change.
 
-`agentScore` on a finding is 0 to 100: how sure you are that the quoted line breaks. `agentScore` beside the findings is 0 to 100 and points the other way: 100 means you would pass the change. Omit a finding's `agentScore` only when you are fully sure; rank then treats it as 100.
+`agentScore` on a finding is 0 to 100: how sure you are that the quoted line breaks. `agentScore` beside the findings is 0 to 100 and points the other way: 100 means you would pass the change. `checked` lists every non-test source file in Added lines that you read. Rank withholds Passed until that list is complete. Omit a finding's `agentScore` only when you are fully sure; rank then treats it as 100.
 
 Say what breaks, name the symbol, and give the change that removes the bug. For security and architecture, say why that change holds. Do not hedge, restate the quoted line, or file a question. An empty `findings` array is valid only after the added lines of every non-test source file have been checked against the catalog and none of them contain an important bug.
 

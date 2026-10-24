@@ -141,6 +141,7 @@ export function main(argv: string[]): number {
       files: graph.summary.files,
       symbols: graph.summary.symbols,
       agentScore: ranked.agentScore,
+      covered: ranked.covered,
     });
     const directory = join(root, ".astroidal");
     writeFileSync(

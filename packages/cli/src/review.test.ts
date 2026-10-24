@@ -379,6 +379,19 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
   assert.equal(worried.evidence, 99);
   assert.equal(worried.value, 79);
   assert.equal(worried.verdict, "review");
+  const uncovered = scoreReview({
+    impact: calm,
+    findings: [],
+    reviewed: true,
+    partial: false,
+    additions: 1,
+    deletions: 0,
+    files: 1,
+    symbols: 0,
+    covered: false,
+  });
+  assert.equal(uncovered.verdict, "review");
+  assert.match(uncovered.reason, /every added block/);
 });
 
 test("a stacked remote diff keeps the child body and every added line", () => {
@@ -520,6 +533,29 @@ test("rank keeps a quoted bug and drops a nit", () => {
   assert.equal(ranked.findings[0]?.severity, "high");
   assert.equal(ranked.dropped.length, 1);
   assert.deepEqual(ranked.groups, []);
+  assert.equal(ranked.covered, true);
+});
+
+test("rank withholds Passed until every added source block is checked", () => {
+  const graph = {
+    files: [
+      { path: "src/auth.ts", additions: 2 },
+      { path: "src/auth.test.ts", additions: 4 },
+      { path: "README.md", additions: 3 },
+    ],
+    neighbors: [],
+    units: [],
+  } as unknown as Graph;
+  const open = rankFindings(graph, { findings: [], checked: [] }, () => null);
+  assert.equal(open.covered, false);
+  assert.deepEqual(open.missing, ["src/auth.ts"]);
+  const closed = rankFindings(
+    graph,
+    { findings: [], checked: ["src/auth.ts"], agentScore: 91 },
+    () => null,
+  );
+  assert.equal(closed.covered, true);
+  assert.equal(closed.agentScore, 91);
 });
 
 test("rank keeps a logical group and drops a path outside the map", () => {

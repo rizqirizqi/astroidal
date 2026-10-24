@@ -151,6 +151,7 @@ export function scoreReview(input: {
   files: number;
   symbols: number;
   agentScore?: number | null;
+  covered?: boolean;
 }): ReviewScore {
   const lines = Math.max(0, input.additions + input.deletions);
   const findingDrag = input.findings.reduce((sum, finding) => {
@@ -181,11 +182,16 @@ export function scoreReview(input: {
           Math.min(100, Math.round(0.8 * evidence + 0.2 * agentScore)),
         );
   const clean = input.findings.length === 0;
+  const covered = input.covered !== false;
   let verdict: Verdict = "fix";
   let reason = "Fix the cusp alerts before this passes.";
   if (!input.reviewed) reason = "Rank the findings before this can pass.";
   else if (!clean) reason = "Fix the cusp alerts before this passes.";
-  else if (value < PASS_LINE) {
+  else if (!covered) {
+    verdict = "review";
+    reason =
+      "No cusp alerts. The hunt did not mark every added block, so a person still reviews the detail.";
+  } else if (value < PASS_LINE) {
     verdict = "review";
     reason =
       "No cusp alerts. The impact is high, so a person still reviews the detail.";
