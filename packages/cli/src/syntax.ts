@@ -7,6 +7,10 @@ export type Language =
   | "go"
   | "rust"
   | "java"
+  | "kotlin"
+  | "scala"
+  | "csharp"
+  | "swift"
   | "php"
   | "ruby"
   | "c"
@@ -25,9 +29,11 @@ const EXTENSIONS: Record<string, Language> = {
   ".go": "go",
   ".rs": "rust",
   ".java": "java",
-  ".kt": "java",
-  ".scala": "java",
-  ".cs": "java",
+  ".kt": "kotlin",
+  ".kts": "kotlin",
+  ".scala": "scala",
+  ".cs": "csharp",
+  ".swift": "swift",
   ".php": "php",
   ".rb": "ruby",
   ".c": "c",
@@ -35,7 +41,6 @@ const EXTENSIONS: Record<string, Language> = {
   ".cc": "c",
   ".cpp": "c",
   ".hpp": "c",
-  ".swift": "java",
 };
 
 const SOURCE_EXTENSIONS = new Set(Object.keys(EXTENSIONS));
@@ -270,6 +275,10 @@ function matchDeclaration(
   if (language === "go") return matchGo(line);
   if (language === "rust") return matchRust(line);
   if (language === "java") return matchJava(line, insideClass);
+  if (language === "kotlin") return matchKotlin(line, insideClass);
+  if (language === "scala") return matchScala(line, insideClass);
+  if (language === "csharp") return matchCSharp(line, insideClass);
+  if (language === "swift") return matchSwift(line, insideClass);
   if (language === "php") return matchPhp(line);
   if (language === "ruby") return matchRuby(line);
   if (language === "c") return matchC(line);
@@ -450,6 +459,140 @@ function matchJava(
   return null;
 }
 
+function matchKotlin(
+  line: string,
+  insideClass: boolean,
+): {
+  name: string;
+  kind: SyntaxSymbol["kind"];
+  exported: boolean;
+  signature: string;
+} | null {
+  const exported =
+    /\b(public|internal)\b/.test(line) || !/\bprivate\b/.test(line);
+  let match = line.match(
+    /^(?:public\s+|private\s+|internal\s+|protected\s+|abstract\s+|open\s+|data\s+|sealed\s+|inner\s+|value\s+)*(class|interface|object|enum)\s+([A-Za-z_][\w]*)/,
+  );
+  if (match?.[2])
+    return {
+      name: match[2],
+      kind: match[1] === "interface" ? "type" : "class",
+      exported,
+      signature: line,
+    };
+  match = line.match(
+    /^(?:public\s+|private\s+|internal\s+|protected\s+|override\s+|suspend\s+|inline\s+|operator\s+|infix\s+)*fun\s+(?:<[^>]+>\s*)?(?:[A-Za-z_][\w]*\.)?([A-Za-z_][\w]*)\s*\(/,
+  );
+  if (match?.[1] && !KEYWORDS.has(match[1]))
+    return {
+      name: match[1],
+      kind: insideClass ? "method" : "function",
+      exported,
+      signature: line,
+    };
+  return null;
+}
+
+function matchScala(
+  line: string,
+  insideClass: boolean,
+): {
+  name: string;
+  kind: SyntaxSymbol["kind"];
+  exported: boolean;
+  signature: string;
+} | null {
+  const exported = !/\bprivate\b/.test(line);
+  let match = line.match(
+    /^(?:public\s+|private\s+|protected\s+|abstract\s+|sealed\s+|final\s+|open\s+|case\s+)*(class|trait|object|enum)\s+([A-Za-z_][\w]*)/,
+  );
+  if (match?.[2])
+    return {
+      name: match[2],
+      kind: match[1] === "trait" ? "type" : "class",
+      exported,
+      signature: line,
+    };
+  match = line.match(
+    /^(?:override\s+|private\s+|protected\s+|final\s+|implicit\s+)*def\s+([A-Za-z_][\w]*)/,
+  );
+  if (match?.[1] && !KEYWORDS.has(match[1]))
+    return {
+      name: match[1],
+      kind: insideClass ? "method" : "function",
+      exported,
+      signature: line,
+    };
+  return null;
+}
+
+function matchCSharp(
+  line: string,
+  insideClass: boolean,
+): {
+  name: string;
+  kind: SyntaxSymbol["kind"];
+  exported: boolean;
+  signature: string;
+} | null {
+  const exported = /\bpublic\b/.test(line);
+  let match = line.match(
+    /^(?:public\s+|private\s+|protected\s+|internal\s+|static\s+|abstract\s+|sealed\s+|partial\s+|readonly\s+)*(class|interface|struct|record|enum)\s+([A-Za-z_][\w]*)/,
+  );
+  if (match?.[2])
+    return {
+      name: match[2],
+      kind: match[1] === "interface" ? "type" : "class",
+      exported,
+      signature: line,
+    };
+  if (!insideClass) return null;
+  match = line.match(
+    /^(?:public\s+|private\s+|protected\s+|internal\s+|static\s+|async\s+|override\s+|virtual\s+|abstract\s+|sealed\s+|partial\s+|extern\s+)*(?:[\w.<>,?[\]\s]+\s+)?([A-Za-z_][\w]*)\s*\(/,
+  );
+  if (
+    match?.[1] &&
+    !KEYWORDS.has(match[1]) &&
+    !/^(if|for|foreach|while|switch|catch|using|lock|fixed)\b/.test(line)
+  )
+    return { name: match[1], kind: "method", exported, signature: line };
+  return null;
+}
+
+function matchSwift(
+  line: string,
+  insideClass: boolean,
+): {
+  name: string;
+  kind: SyntaxSymbol["kind"];
+  exported: boolean;
+  signature: string;
+} | null {
+  const exported =
+    /\b(public|open)\b/.test(line) || !/\b(private|fileprivate)\b/.test(line);
+  let match = line.match(
+    /^(?:public\s+|open\s+|internal\s+|private\s+|fileprivate\s+|final\s+|actor\s+)*(class|struct|enum|protocol|actor)\s+([A-Za-z_][\w]*)/,
+  );
+  if (match?.[2])
+    return {
+      name: match[2],
+      kind: match[1] === "protocol" ? "type" : "class",
+      exported,
+      signature: line,
+    };
+  match = line.match(
+    /^(?:public\s+|open\s+|internal\s+|private\s+|fileprivate\s+|static\s+|class\s+|override\s+|mutating\s+|async\s+)*func\s+([A-Za-z_][\w]*)\s*\(/,
+  );
+  if (match?.[1] && !KEYWORDS.has(match[1]))
+    return {
+      name: match[1],
+      kind: insideClass ? "method" : "function",
+      exported,
+      signature: line,
+    };
+  return null;
+}
+
 function matchPhp(line: string): {
   name: string;
   kind: SyntaxSymbol["kind"];
@@ -583,8 +726,16 @@ function matchImport(
     const spec = line.match(/^use\s+([^;]+)/)?.[1];
     if (spec) return { spec: spec.trim(), names: [] };
   }
-  if (language === "java") {
+  if (language === "java" || language === "kotlin" || language === "scala") {
     const spec = line.match(/^import\s+(?:static\s+)?([\w.]+)/)?.[1];
+    if (spec) return { spec, names: [] };
+  }
+  if (language === "csharp") {
+    const spec = line.match(/^using\s+(?:static\s+)?([\w.]+)\s*;/)?.[1];
+    if (spec) return { spec, names: [] };
+  }
+  if (language === "swift") {
+    const spec = line.match(/^import\s+([A-Za-z_][\w.]*)/)?.[1];
     if (spec) return { spec, names: [] };
   }
   if (language === "php") {

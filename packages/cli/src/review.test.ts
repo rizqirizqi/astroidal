@@ -18,7 +18,7 @@ import { countChangedSpan, parseUnifiedDiff } from "./diff.js";
 import { readEvidence, writeEvidence } from "./evidence.js";
 import { writePackets } from "./packets.js";
 import { rankFindings } from "./rank.js";
-import { parseSyntax } from "./syntax.js";
+import { languageFor, parseSyntax } from "./syntax.js";
 import type { Graph } from "./types.js";
 
 test("parseArgs splits pull request lists and repeated labels", () => {
@@ -109,6 +109,64 @@ export class Users {
   );
   assert.equal(python.symbols[0]?.name, "load_user");
   assert.ok((python.symbols[0]?.decisions ?? 0) >= 1);
+});
+
+test("kotlin, scala, csharp, and swift parse with their own grammars", () => {
+  assert.equal(languageFor("App.kt"), "kotlin");
+  assert.notEqual(languageFor("App.kt"), "java");
+  assert.equal(languageFor("App.scala"), "scala");
+  assert.equal(languageFor("User.cs"), "csharp");
+  assert.equal(languageFor("User.swift"), "swift");
+  const kotlin = parseSyntax(
+    "App.kt",
+    `package app
+import demo.User
+fun loadUser(id: String): User? {
+  return null
+}
+`,
+  );
+  assert.deepEqual(
+    kotlin.symbols.map((symbol) => symbol.name),
+    ["loadUser"],
+  );
+  assert.equal(kotlin.imports[0]?.spec, "demo.User");
+  const scala = parseSyntax(
+    "Users.scala",
+    `import demo.User
+class Users {
+  def loadUser(): User = null
+}
+`,
+  );
+  assert.ok(scala.symbols.some((symbol) => symbol.name === "loadUser"));
+  assert.equal(scala.imports[0]?.spec, "demo.User");
+  const csharp = parseSyntax(
+    "User.cs",
+    `using System.Text;
+public class Users {
+  public string Load() {
+    return name;
+  }
+}
+`,
+  );
+  assert.equal(csharp.imports[0]?.spec, "System.Text");
+  assert.ok(csharp.symbols.some((symbol) => symbol.name === "Users"));
+  assert.ok(csharp.symbols.some((symbol) => symbol.name === "Load"));
+  const swift = parseSyntax(
+    "User.swift",
+    `import Foundation
+func loadUser() -> String {
+  return ""
+}
+`,
+  );
+  assert.deepEqual(
+    swift.symbols.map((symbol) => symbol.name),
+    ["loadUser"],
+  );
+  assert.equal(swift.imports[0]?.spec, "Foundation");
 });
 
 test("exposure score stays inside 0 to 100", () => {
