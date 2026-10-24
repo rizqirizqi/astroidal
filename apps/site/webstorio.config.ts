@@ -2,7 +2,7 @@ import { defineConfig } from "@webstorio/cli/config";
 
 const TITLE = "Astroidal — AI code review map, scorer, and helper";
 const DESCRIPTION =
-  "Astroidal draws the blast radius of a change, hands your agent a bug map, and scores what survives: Passed or Fix first. No dependency. One npx command.";
+  "Astroidal draws the blast radius of a change, hands your agent a bug map, and scores what survives: Passed, Review, or Fix first. No dependency. One npx command.";
 
 export default defineConfig({
   name: "Astroidal",

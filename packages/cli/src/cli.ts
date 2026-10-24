@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { buildMap, scoreReview } from "./analyze.js";
+import { buildMap, scoreReview, verdictLabel } from "./analyze.js";
 import { writeEvidence, readEvidence } from "./evidence.js";
 import { CommandError, repoRoot } from "./git.js";
 import { renderConstellation } from "./html.js";
@@ -151,7 +151,7 @@ export function main(argv: string[]): number {
       join(directory, "constellation.html"),
       renderConstellation(graph),
     );
-    const verdict = graph.score.verdict === "passed" ? "Passed" : "Fix first";
+    const verdict = verdictLabel(graph.score.verdict);
     console.log(
       [
         refreshGlobalSkill(),
@@ -191,7 +191,7 @@ function summarize(graph: Graph): string {
   const lines = [
     `Mapped ${graph.units.map((unit) => unit.label).join(", ") || "nothing"}: ${graph.summary.files} files, ${graph.summary.symbols} symbols, ${graph.summary.neighbors} neighbors.`,
     `Impact: blast ${impact.blastRadius} (${impact.blastFiles} files), complexity ${impact.complexityRaw >= 0 ? "+" : ""}${impact.complexityRaw}, security ${impact.securityExposure}, performance ${impact.performanceImpact}.`,
-    `Score ${graph.score.value}: ${graph.score.verdict === "passed" ? "Passed" : "Fix first"}. ${graph.score.reason}`,
+    `Score ${graph.score.value}: ${verdictLabel(graph.score.verdict)}. ${graph.score.reason}`,
     ...graph.notes,
     graph.commands.length > 0 ? `Commands: ${graph.commands.join(" | ")}` : "",
     "Wrote .astroidal/constellation.html and .astroidal/packets/bug-map.md",

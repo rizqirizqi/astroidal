@@ -71,9 +71,11 @@ export interface GraphUnit {
   head?: string;
 }
 
+export type Verdict = "passed" | "review" | "fix";
+
 export interface ReviewScore {
   value: number;
-  verdict: "passed" | "fix";
+  verdict: Verdict;
   reason: string;
 }
 

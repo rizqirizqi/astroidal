@@ -153,4 +153,4 @@ If rank drops a finding because the quote or path is wrong, fix that finding onc
 
 ## Reply
 
-Write a short prose summary in chat. Open with a line the person can paste: `Astroidal {score} · Passed` or `Astroidal {score} · Fix first`. Then name the highest-severity issues and the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart. The human still decides whether to merge.
+Write a short prose summary in chat. Open with a line the person can paste: `Astroidal {score} · Passed`, `Astroidal {score} · Review`, or `Astroidal {score} · Fix first`. Passed means a person can skip the detail. Review means a person still reads the change. Then name the highest-severity issues and the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart. The human still decides whether to merge.

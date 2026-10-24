@@ -33,6 +33,7 @@ import type {
   RiskTier,
   Severity,
   Spectral,
+  Verdict,
   SyntaxSymbol,
 } from "./types.js";
 
@@ -123,6 +124,12 @@ export function exposureScore(count: number, slope: number): number {
 
 const PASS_LINE = 80;
 
+export function verdictLabel(verdict: Verdict): string {
+  if (verdict === "passed") return "Passed";
+  if (verdict === "review") return "Review";
+  return "Fix first";
+}
+
 export function scoreReview(input: {
   impact: ImpactScores;
   findings: Array<{ severity: Severity }>;
@@ -156,21 +163,22 @@ export function scoreReview(input: {
     medium * 0.24 +
     (input.partial ? 0.05 : 0) +
     (input.reviewed ? 0 : 0.42);
-  const raw = Math.max(0, Math.min(100, Math.round(100 * Math.exp(-drag))));
+  const value = Math.max(0, Math.min(100, Math.round(100 * Math.exp(-drag))));
   const clean = critical + high + medium === 0;
-  const passed = input.reviewed && clean;
-  const value =
-    passed && raw < PASS_LINE
-      ? Math.min(PASS_LINE - 1, Math.round(raw + (PASS_LINE - raw) * 0.45))
-      : raw;
-  let reason =
-    "No important findings, and the impact stays under the pass line.";
+  let verdict: Verdict = "fix";
+  let reason = "Fix the cusp alerts before this passes.";
   if (!input.reviewed) reason = "Rank the findings before this can pass.";
   else if (!clean) reason = "Fix the cusp alerts before this passes.";
-  else if (value < PASS_LINE)
+  else if (value < PASS_LINE) {
+    verdict = "review";
     reason =
-      "No findings. Warning: the impact is high, so the score stays low.";
-  return { value, verdict: passed ? "passed" : "fix", reason };
+      "No cusp alerts. The impact is high, so a person still reviews the detail.";
+  } else {
+    verdict = "passed";
+    reason =
+      "No important findings, and the impact stays under the pass line. The detail does not need another review.";
+  }
+  return { value, verdict, reason };
 }
 
 export function buildMap(scope: ScopeResult): BuildResult {

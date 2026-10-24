@@ -314,12 +314,9 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
     files: 12,
     symbols: 20,
   });
-  assert.equal(wide.verdict, "passed");
-  assert.ok(wide.value >= 50 && wide.value < 80);
-  assert.match(
-    wide.reason,
-    /Warning: the impact is high, so the score stays low/,
-  );
+  assert.equal(wide.verdict, "review");
+  assert.ok(wide.value < 80);
+  assert.match(wide.reason, /a person still reviews the detail/);
   assert.ok(wide.value < edited.value - 15);
   const unreviewed = scoreReview({
     impact: calm,

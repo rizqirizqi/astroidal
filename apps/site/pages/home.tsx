@@ -72,7 +72,7 @@ function Hero() {
             <p className="max-w-md text-base leading-7 text-[#A8B3C7] [text-shadow:0_1px_14px_rgb(11,15,25)] sm:text-lg">
               Astroidal draws the blast radius, hands your agent a bug map, and
               keeps a finding only when it quotes a real line. The verdict is
-              Passed, or Fix first.
+              Passed, Review, or Fix first.
             </p>
             <div className="pointer-events-auto mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
               <CopyButton value={SETUP_PROMPT} label="Copy setup prompt" />
@@ -468,7 +468,8 @@ function Setup() {
           </h2>
           <p className="mt-5 text-base leading-7 text-[#A8B3C7]">
             Graph the change, let the agent search it, then rank. The reply you
-            want back is the score, Passed or Fix first, and the two paths.
+            want back is the score, Passed, Review, or Fix first, and the two
+            paths.
           </p>
           <div className="mt-7">
             <CopyButton value={SETUP_PROMPT} label="Copy setup prompt" />
@@ -544,8 +545,8 @@ function Close() {
           Hand your agent the map.
         </h2>
         <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-[#A8B3C7]">
-          The next reply should open with the score, say Passed or Fix first,
-          and point at the chart and the review.
+          The next reply should open with the score, say Passed, Review, or Fix
+          first, and point at the chart and the review.
         </p>
         <div className="mt-8 flex justify-center">
           <CopyButton value={SETUP_PROMPT} label="Copy setup prompt" />

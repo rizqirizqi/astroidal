@@ -1,3 +1,4 @@
+import { verdictLabel } from "./analyze.js";
 import type {
   DroppedFinding,
   Graph,
@@ -196,7 +197,7 @@ export function renderReview(graph: Graph, result: RankResult): string {
     "",
     ...(graph.score
       ? [
-          `Score: ${graph.score.value} · ${graph.score.verdict === "passed" ? "Passed" : "Fix first"}. ${graph.score.reason}`,
+          `Score: ${graph.score.value} · ${verdictLabel(graph.score.verdict)}. ${graph.score.reason}`,
           "",
         ]
       : []),

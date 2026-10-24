@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { scoreReview } from "./analyze.js";
+import { scoreReview, verdictLabel } from "./analyze.js";
 import type { Graph, GraphNode, ReviewScore } from "./types.js";
 
 export function renderConstellation(graph: Graph): string {
@@ -36,20 +36,20 @@ export function renderConstellation(graph: Graph): string {
         );
   const impact = graph.impact;
   const review = reviewOf(graph);
-  const verdictLabel = review.verdict === "passed" ? "Passed" : "Fix first";
-  const shareLine = `Astroidal ${review.value} · ${verdictLabel} on ${graph.repoName}. The AI code review map — blast radius, bug map, and a score. npx --yes astroidal graph`;
+  const verdictText = verdictLabel(review.verdict);
+  const shareLine = `Astroidal ${review.value} · ${verdictText} on ${graph.repoName}. The AI code review map — blast radius, bug map, and a score. npx --yes astroidal graph`;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictLabel}</title>
+  <title>Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictText}</title>
   <meta name="description" content="${escapeHtml(shareLine)}">
-  <meta property="og:title" content="Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictLabel}">
+  <meta property="og:title" content="Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictText}">
   <meta property="og:description" content="${escapeHtml(shareLine)}">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictLabel}">
+  <meta name="twitter:title" content="Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictText}">
   <meta name="twitter:description" content="${escapeHtml(shareLine)}">
   <style>
     :root {
@@ -131,11 +131,13 @@ export function renderConstellation(graph: Graph): string {
     .verdict { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0 0 18px; }
     .verdict-fix { border-color: rgba(255, 176, 32, 0.7); }
     .verdict-passed { border-color: rgba(0, 242, 254, 0.7); }
+    .verdict-review { border-color: rgba(210, 180, 255, 0.7); }
     .verdict-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 2px 0 8px; }
     .verdict-row b { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 40px; line-height: 1; font-weight: 500; letter-spacing: -0.05em; }
     .verdict-label { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; }
     .verdict-fix .verdict-row b, .verdict-fix .verdict-label { color: var(--amber); }
     .verdict-passed .verdict-row b, .verdict-passed .verdict-label { color: var(--cyan); }
+    .verdict-review .verdict-row b, .verdict-review .verdict-label { color: var(--violet-ink); }
     .verdict .quiet { margin: 0; font-size: 13px; }
     .legend, .units, .alerts { list-style: none; padding: 0; margin: 0 0 16px; }
     .surface { width: 100%; height: auto; display: block; margin: 0 0 4px; }
@@ -389,7 +391,7 @@ function renderTree(branch: {
 }
 
 function scoreCard(score: ReviewScore): string {
-  const label = score.verdict === "passed" ? "Passed" : "Fix first";
+  const label = verdictLabel(score.verdict);
   return `<section class="verdict verdict-${score.verdict}" aria-label="Astroidal score ${score.value}, ${label}"><p class="eyebrow">Astroidal score</p><p class="verdict-row"><b>${score.value}</b><span class="verdict-label">${label}</span></p><p class="quiet">${escapeHtml(score.reason)}</p></section>`;
 }
 

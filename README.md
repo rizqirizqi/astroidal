@@ -1,6 +1,6 @@
-# Astroidal
+# Astroidal ✦
 
-AI code review map, scorer, and helper. Astroidal draws the change. Your agent looks for bugs. Astroidal scores what survives: **Passed** or **Fix first**.
+AI code review map, scorer, and helper. Astroidal draws the change. Your agent looks for bugs. Astroidal scores what survives: **Passed**, **Review**, or **Fix first**.
 
 ## How a review goes
 
@@ -28,7 +28,7 @@ Follow the installed Astroidal skill: search the bug map and write .astroidal/fi
 
 npx --yes astroidal rank
 
-Reply with the score, Passed or Fix first, and the paths to .astroidal/review.md and .astroidal/constellation.html.
+Reply with the score, Passed, Review, or Fix first, and the paths to .astroidal/review.md and .astroidal/constellation.html.
 ```
 
 `init` installs the skill into `.agents/skills/astroidal/` and `.cursor/skills/astroidal/`, and ignores `.astroidal/`. `init --global` installs it for every repository. `init --force` replaces a skill you edited. A newer Astroidal refreshes an unmodified global skill on `graph` or `rank`.

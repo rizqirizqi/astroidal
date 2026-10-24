@@ -11,6 +11,7 @@ COLORS:
 - Primary / Passed: #00F2FE
 - Nebula: #7F00FF
 - Iris: #D2B4FF
+- Review: #D2B4FF
 - Fix first: #FFB020
 
 TYPOGRAPHY: IBM Plex Sans for headlines and body. JetBrains Mono for eyebrows, scores, paths, and commands.

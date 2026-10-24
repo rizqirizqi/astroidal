@@ -12,7 +12,7 @@ Follow the installed Astroidal skill: search the bug map and write .astroidal/fi
 
 npx --yes astroidal rank
 
-Reply with the score, Passed or Fix first, and the paths to .astroidal/review.md and .astroidal/constellation.html.`;
+Reply with the score, Passed, Review, or Fix first, and the paths to .astroidal/review.md and .astroidal/constellation.html.`;
 
 export const NAV_ITEMS = [
   { href: "#review", label: "Review" },
@@ -42,7 +42,7 @@ export const WORKFLOW = [
     who: "Astroidal",
     tone: "tool",
     title: "Scores the review",
-    text: "The verdict is Passed, or Fix first. Rank keeps critical, high, and medium findings that still quote a real line.",
+    text: "The verdict is Passed, Review, or Fix first. Passed means the detail can be skipped. Review means a person still reads the change. Fix first means a quoted bug remains.",
   },
 ] as const;
 
@@ -67,9 +67,9 @@ export const QUESTIONS = [
       "Your agent. Astroidal maps the change and writes the packets. The agent searches those packets and writes .astroidal/findings.json. rank scores what still quotes a real line.",
   },
   {
-    question: "What does Passed or Fix first mean?",
+    question: "What does Passed, Review, or Fix first mean?",
     answer:
-      "Rank keeps critical, high, and medium findings that quote a line in the change or a direct neighbor. Those findings land on the map as cusp alerts. An empty set of alerts can still be a real Passed, after the added lines have been checked.",
+      "Passed means rank found no cusp and the score is at least 80, so a person can skip the detail. Review means there is no cusp and a person still reads the change, because the impact is high. Fix first means rank kept a finding that quotes a real line.",
   },
   {
     question: "What can one map cover?",
