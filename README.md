@@ -37,7 +37,7 @@ Reply with the score, Passed, Review, or Fix first, and the paths to .astroidal/
 
 `rank` appends one row to `.astroidal/log.jsonl`: the head, the verdict, the score, and each cusp's path, symbol, and quote. A later row records a cusp that matches an earlier one on the same path and symbol. `.astroidal/` stays gitignored, so the log belongs to this clone.
 
-`comment` writes one comment on the pull request: the score, the verdict, and the cusp paths. It updates that same comment when it runs again. It does not approve, merge, or request reviewers. Pass `--pr` when the map has no pull request, or when it covers more than one.
+`comment` writes one comment on the pull request: the score, the verdict, and the cusp paths. It updates that same comment when it runs again. It does not approve, merge, or request reviewers. Pass `--pr` when the map has no pull request, or when it covers more than one. A batch lists one verdict for each pull request. The merged map stays one score.
 
 ## Output
 
@@ -53,7 +53,7 @@ Rank keeps critical, high, and medium findings that quote a real line in the cha
 
 ## Scope
 
-A dirty worktree maps uncommitted changes, including untracked files. A clean branch maps that branch against its default base.
+A dirty worktree maps uncommitted changes, including untracked files. A clean branch maps that branch against its default base. A batch stays one map, and each pull request also gets Passed, Review, or Fix first.
 
 ```bash
 npx --yes astroidal graph --pr 12,18,24

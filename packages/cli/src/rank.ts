@@ -1,8 +1,9 @@
-import { verdictLabel } from "./analyze.js";
+import { scoreReview, verdictLabel } from "./analyze.js";
 import { isSourcePath } from "./syntax.js";
 import type {
   DroppedFinding,
   Graph,
+  GraphUnit,
   RankedFinding,
   ReviewGroup,
   Severity,
@@ -223,6 +224,7 @@ export function renderReview(graph: Graph, result: RankResult): string {
           "",
         ]
       : []),
+    ...unitVerdicts(graph),
     "Chart: `.astroidal/constellation.html`",
     "",
   ];
@@ -253,6 +255,79 @@ export function renderReview(graph: Graph, result: RankResult): string {
     lines.push("");
   }
   return lines.join("\n");
+}
+
+export function assignUnitScores(
+  graph: Graph,
+  findings: RankedFinding[],
+  missing: string[],
+  agentScore: number | null,
+): void {
+  const open = new Set(missing);
+  for (const unit of graph.units) {
+    const files = graph.files.filter((file) => file.units.includes(unit.id));
+    const symbols = graph.nodes.filter(
+      (node) =>
+        node.role === "changed" &&
+        node.kind !== "file" &&
+        node.units.includes(unit.id),
+    ).length;
+    const unitFindings = findings.filter((finding) =>
+      findingInUnit(finding, unit, graph),
+    );
+    const required = files
+      .filter(
+        (file) =>
+          file.additions > 0 &&
+          isSourcePath(file.path) &&
+          !isTestPath(file.path),
+      )
+      .map((file) => file.path);
+    const impact =
+      graph.impact.byUnit.find((item) => item.unitId === unit.id) ??
+      graph.impact;
+    unit.score = scoreReview({
+      impact,
+      findings: unitFindings,
+      reviewed: true,
+      partial: files.some((file) => file.partial),
+      additions: files.reduce((sum, file) => sum + file.additions, 0),
+      deletions: files.reduce((sum, file) => sum + file.deletions, 0),
+      files: files.length,
+      symbols,
+      agentScore,
+      covered: required.every((path) => !open.has(path)),
+    });
+  }
+}
+
+function unitVerdicts(graph: Graph): string[] {
+  if (graph.units.length < 2) return [];
+  const lines = graph.units.flatMap((unit) => {
+    if (!unit.score) return [];
+    return [
+      `${unit.label}: ${unit.score.value} · ${verdictLabel(unit.score.verdict)}`,
+    ];
+  });
+  return lines.length === 0 ? [] : [...lines, ""];
+}
+
+function findingInUnit(
+  finding: RankedFinding,
+  unit: GraphUnit,
+  graph: Graph,
+): boolean {
+  const labels = finding.pr.split(",").map((item) => item.trim());
+  const named =
+    labels.includes(unit.label) ||
+    (unit.pr != null && labels.includes(`PR ${unit.pr}`));
+  const file = graph.files.find((item) => item.path === finding.path);
+  if (file) return file.units.includes(unit.id) && named;
+  const neighbor = graph.neighbors.find((item) => item.path === finding.path);
+  if (!neighbor) return false;
+  const via = graph.files.find((item) => item.path === neighbor.via);
+  if (!via) return graph.units.length === 1;
+  return via.units.includes(unit.id) && named;
 }
 
 function readGroups(input: unknown, graph: Graph): ReviewGroup[] {

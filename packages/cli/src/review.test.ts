@@ -18,7 +18,7 @@ import { countChangedSpan, parseUnifiedDiff } from "./diff.js";
 import { readEvidence, writeEvidence } from "./evidence.js";
 import { writePackets } from "./packets.js";
 import { githubSlug, gitlabSlug } from "./forge.js";
-import { rankFindings } from "./rank.js";
+import { assignUnitScores, rankFindings, renderReview } from "./rank.js";
 import { languageFor, parseSyntax } from "./syntax.js";
 import type { Graph } from "./types.js";
 
@@ -1501,6 +1501,91 @@ exit 1
     rmSync(root, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
   }
+});
+
+test("each pull request keeps its own verdict", () => {
+  const calm = {
+    blastRadius: 0,
+    complexityDelta: 0,
+    securityExposure: 0,
+    performanceImpact: 0,
+    blastFiles: 0,
+    complexityRaw: 0,
+    securityLeads: 0,
+    performanceLeads: 0,
+  };
+  const graph = {
+    units: [
+      { id: "pr-12", label: "PR 12", pr: 12, source: "local" },
+      { id: "pr-18", label: "PR 18", pr: 18, source: "local" },
+    ],
+    files: [
+      {
+        path: "src/a.ts",
+        units: ["pr-12"],
+        additions: 2,
+        deletions: 0,
+        partial: false,
+      },
+      {
+        path: "src/b.ts",
+        units: ["pr-18"],
+        additions: 2,
+        deletions: 0,
+        partial: false,
+      },
+    ],
+    nodes: [],
+    neighbors: [],
+    impact: {
+      ...calm,
+      byUnit: [
+        { unitId: "pr-12", label: "PR 12", ...calm },
+        { unitId: "pr-18", label: "PR 18", ...calm },
+      ],
+    },
+    score: {
+      value: 31,
+      verdict: "fix",
+      reason: "Fix the cusp alerts before this passes.",
+      evidence: 31,
+      agentScore: null,
+    },
+    findings: [],
+    groups: [],
+  } as unknown as Graph;
+  assignUnitScores(
+    graph,
+    [
+      {
+        id: "A-001",
+        pr: "PR 12",
+        severity: "critical",
+        agentScore: 100,
+        description: "The query concatenates the password.",
+        path: "src/a.ts",
+        line: 1,
+        recommendation: "Bind it.",
+        category: "security",
+        quote: "select password",
+      },
+    ],
+    [],
+    null,
+  );
+  assert.equal(graph.units[0]?.score?.verdict, "fix");
+  assert.equal(graph.units[1]?.score?.verdict, "passed");
+  const review = renderReview(graph, {
+    findings: graph.findings,
+    dropped: [],
+    groups: [],
+    agentScore: null,
+    covered: true,
+    missing: [],
+  });
+  assert.match(review, /PR 12: \d+ · Fix first/);
+  assert.match(review, /PR 18: \d+ · Passed/);
+  assert.doesNotMatch(review, /returned/i);
 });
 
 test("the review log matches a later cusp on the same path and symbol", () => {

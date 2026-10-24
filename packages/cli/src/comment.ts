@@ -71,12 +71,19 @@ export function commentBody(graph: Graph): string {
             return `- \`${finding.path}${line}\` ${finding.id}`;
           }),
         ].join("\n");
+  const units = (graph.units ?? []).flatMap((unit) => {
+    if (!unit.score || (graph.units ?? []).length < 2) return [];
+    return [
+      `${unit.label}: ${unit.score.value} · ${verdictLabel(unit.score.verdict)}`,
+    ];
+  });
   return [
     MARKER,
     `Astroidal ${score.value} · ${verdict}`,
     "",
     score.reason,
     "",
+    ...(units.length > 0 ? [...units, ""] : []),
     cusps,
     "",
     "Map: `.astroidal/constellation.html`",

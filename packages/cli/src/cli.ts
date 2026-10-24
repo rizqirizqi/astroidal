@@ -17,7 +17,7 @@ import { installSkill, packageRoot, refreshGlobalSkill } from "./init.js";
 import { writePackets } from "./packets.js";
 import { readRepoFile, resolveScope } from "./scope.js";
 import { postComment } from "./comment.js";
-import { rankFindings, renderReview } from "./rank.js";
+import { assignUnitScores, rankFindings, renderReview } from "./rank.js";
 import type { Graph, GraphOptions } from "./types.js";
 
 const HELP = `Astroidal is the AI code review map, scorer, and helper.
@@ -162,6 +162,7 @@ export function main(argv: string[]): number {
       agentScore: ranked.agentScore,
       covered: ranked.covered,
     });
+    assignUnitScores(graph, ranked.findings, ranked.missing, ranked.agentScore);
     const directory = join(root, ".astroidal");
     writeFileSync(
       join(directory, "graph.json"),

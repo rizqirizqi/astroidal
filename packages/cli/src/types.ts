@@ -69,6 +69,7 @@ export interface GraphUnit {
   source: "local" | "remote-diff";
   base?: string;
   head?: string;
+  score?: ReviewScore;
 }
 
 export type Verdict = "passed" | "review" | "fix";

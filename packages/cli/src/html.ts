@@ -25,7 +25,15 @@ export function renderConstellation(graph: Graph): string {
       : `<ol class="alerts">${graph.findings.map((finding) => `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em>${finding.agentScore == null ? "" : ` <span class="agent-score">agent ${finding.agentScore}</span>`} ${escapeHtml(finding.description)}<button type="button" class="alert-path" data-alert-path="${escapeHtml(finding.path)}" data-alert-line="${finding.line ?? ""}" aria-label="Open ${escapeHtml(finding.path)} in the lens">${escapeHtml(finding.path)}${finding.line == null ? "" : `:${finding.line}`}</button></li>`).join("")}</ol>`;
   const unitScores =
     graph.impact.byUnit.length > 1
-      ? `<details class="unit-fold"><summary>${graph.impact.byUnit.length} pull requests</summary><ul class="units">${graph.impact.byUnit.map((unit) => `<li><span>${escapeHtml(unit.label)}</span><em>blast ${unit.blastRadius} · complexity ${signed(unit.complexityRaw)} · security ${unit.securityExposure} · perf ${unit.performanceImpact}</em></li>`).join("")}</ul></details>`
+      ? `<details class="unit-fold"><summary>${graph.impact.byUnit.length} pull requests</summary><ul class="units">${graph.impact.byUnit
+          .map((unit) => {
+            const score = graph.units.find(
+              (item) => item.id === unit.unitId,
+            )?.score;
+            const verdict = score ? ` · ${verdictLabel(score.verdict)}` : "";
+            return `<li><span>${escapeHtml(unit.label)}${verdict}</span><em>blast ${unit.blastRadius} · complexity ${signed(unit.complexityRaw)} · security ${unit.securityExposure} · perf ${unit.performanceImpact}</em></li>`;
+          })
+          .join("")}</ul></details>`
       : "";
   const batchCount = graph.units.length;
   const batchLabel =

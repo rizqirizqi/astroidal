@@ -74,7 +74,7 @@ export const QUESTIONS = [
   {
     question: "What can one map cover?",
     answer:
-      "A dirty worktree, including untracked files. A clean branch against its default base. A batch of pull requests, the stack under the current one, a single commit, or staged changes. A batch is one merged map.",
+      "A dirty worktree, including untracked files. A clean branch against its default base. A batch of pull requests, the stack under the current one, a single commit, or staged changes. A batch stays one map, and each pull request also gets Passed, Review, or Fix first.",
   },
   {
     question: "What do the shapes mean?",
@@ -84,7 +84,7 @@ export const QUESTIONS = [
   {
     question: "What does a pull request show?",
     answer:
-      "comment writes one pull request comment with the score, the verdict, and the cusp paths. It does not approve, merge, or request reviewers. The map stays at .astroidal/constellation.html.",
+      "comment writes one pull request comment with the score, the verdict, and the cusp paths. A batch lists a verdict for each pull request. It does not approve, merge, or request reviewers. The map stays at .astroidal/constellation.html.",
   },
   {
     question: "Where is the source, and what license is it?",
