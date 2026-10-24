@@ -154,6 +154,7 @@ export function rankFindings(
       line: found,
       recommendation,
       category: (item.category ?? "correctness").trim() || "correctness",
+      quote,
     });
   }
 
@@ -172,6 +173,7 @@ export function rankFindings(
       previous.recommendation = finding.recommendation;
       previous.line = finding.line;
       previous.agentScore = finding.agentScore;
+      previous.quote = finding.quote;
     }
     dropped.push({
       description: finding.description,

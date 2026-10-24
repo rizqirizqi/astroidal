@@ -164,6 +164,8 @@ Then run:
 npx --yes astroidal rank
 ```
 
+Rank appends one row to `.astroidal/log.jsonl`: the head, the verdict, the score, and each cusp's path, symbol, and quote. Leave that log in place.
+
 If rank drops a finding because the quote or path is wrong, fix that finding once and rank again. Do not invent a replacement bug to keep the count up. Do not rank a third time.
 
 ## Reply

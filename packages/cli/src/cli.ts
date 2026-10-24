@@ -9,6 +9,7 @@ import {
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildMap, scoreReview, verdictLabel } from "./analyze.js";
+import { appendReviewLog } from "./log.js";
 import { writeEvidence, readEvidence } from "./evidence.js";
 import { CommandError, repoRoot } from "./git.js";
 import { renderConstellation } from "./html.js";
@@ -167,6 +168,7 @@ export function main(argv: string[]): number {
       JSON.stringify(graph, null, 2),
     );
     writeFileSync(join(directory, "review.md"), renderReview(graph, ranked));
+    appendReviewLog(root, graph);
     writeFileSync(
       join(directory, "constellation.html"),
       renderConstellation(graph),

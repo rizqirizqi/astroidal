@@ -35,16 +35,19 @@ Reply with the score, Passed, Review, or Fix first, and the paths to .astroidal/
 
 `rank` exits 1 on Fix first. Passed and Review exit 0. A missing map or findings file still errors.
 
+`rank` appends one row to `.astroidal/log.jsonl`: the head, the verdict, the score, and each cusp's path, symbol, and quote. A later row records a cusp that matches an earlier one on the same path and symbol. `.astroidal/` stays gitignored, so the log belongs to this clone.
+
 `comment` writes one comment on the pull request: the score, the verdict, and the cusp paths. It updates that same comment when it runs again. It does not approve, merge, or request reviewers. Pass `--pr` when the map has no pull request, or when it covers more than one.
 
 ## Output
 
-| File                            | What it is                    |
-| ------------------------------- | ----------------------------- |
-| `.astroidal/constellation.html` | The map and the score         |
-| `.astroidal/packets/bug-map.md` | What the agent searches       |
-| `.astroidal/review.md`          | Ranked findings, after `rank` |
-| `.astroidal/graph.json`         | The same map for tools        |
+| File                            | What it is                      |
+| ------------------------------- | ------------------------------- |
+| `.astroidal/constellation.html` | The map and the score           |
+| `.astroidal/packets/bug-map.md` | What the agent searches         |
+| `.astroidal/review.md`          | Ranked findings, after `rank`   |
+| `.astroidal/log.jsonl`          | Head, verdict, score, and cusps |
+| `.astroidal/graph.json`         | The same map for tools          |
 
 Rank keeps critical, high, and medium findings that quote a real line in the change or a direct neighbor. Those findings show on the map.
 

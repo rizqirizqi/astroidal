@@ -1503,6 +1503,62 @@ exit 1
   }
 });
 
+test("the review log matches a later cusp on the same path and symbol", () => {
+  const root = makeRepo();
+  const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
+  const previous = process.cwd();
+  const previousHome = process.env.HOME;
+  const finding = {
+    description: "The login query concatenates the password.",
+    path: "src/auth.ts",
+    quote: 'return db.query("SELECT " + password)',
+    recommendation: "Bind the password.",
+  };
+  try {
+    process.chdir(root);
+    process.env.HOME = home;
+    assert.equal(main(["graph"]), 0);
+    writeFileSync(
+      join(root, ".astroidal", "findings.json"),
+      JSON.stringify({
+        findings: [{ ...finding, severity: "critical" }],
+        checked: ["src/auth.ts", "src/Login.tsx"],
+      }),
+    );
+    assert.equal(main(["rank"]), 1);
+    writeFileSync(
+      join(root, ".astroidal", "findings.json"),
+      JSON.stringify({
+        findings: [{ ...finding, severity: "medium" }],
+        checked: ["src/auth.ts", "src/Login.tsx"],
+      }),
+    );
+    assert.equal(main(["rank"]), 1);
+    const rows = readFileSync(join(root, ".astroidal", "log.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            matched: Array<{ path: string; symbol: string }>;
+          },
+      );
+    assert.equal(rows[0]?.matched.length, 0);
+    assert.equal(rows[1]?.matched.length, 1);
+    assert.equal(rows[1]?.matched[0]?.path, "src/auth.ts");
+    assert.equal(rows[1]?.matched[0]?.symbol, "login");
+    const review = readFileSync(join(root, ".astroidal", "review.md"), "utf8");
+    assert.match(review, /\| medium \|/);
+    assert.doesNotMatch(review, /returned/i);
+  } finally {
+    process.chdir(previous);
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
 function makeRepo(): string {
   const root = mkdtempSync(join(tmpdir(), "astroidal-"));
   git(root, ["init", "-b", "main"]);

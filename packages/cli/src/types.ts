@@ -156,6 +156,7 @@ export interface RankedFinding {
   line: number | null;
   recommendation: string;
   category: string;
+  quote: string;
 }
 
 export interface Graph {
