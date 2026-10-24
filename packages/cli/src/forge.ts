@@ -19,6 +19,7 @@ export interface PullMeta {
   title?: string;
   headRefName: string;
   baseRefName: string;
+  headOid?: string;
   url?: string;
   author?: string;
   labels: string[];
@@ -29,6 +30,7 @@ interface GhPull {
   title?: string;
   headRefName: string;
   baseRefName: string;
+  headRefOid?: string;
   url?: string;
   author?: { login?: string };
   labels?: Array<{ name?: string }>;
@@ -39,12 +41,14 @@ interface GlabMr {
   title?: string;
   source_branch?: string;
   target_branch?: string;
+  sha?: string;
   web_url?: string;
   author?: { username?: string } | string;
   labels?: Array<string | { name?: string }> | null;
 }
 
-const GH_FIELDS = "number,title,headRefName,baseRefName,url,author,labels";
+const GH_FIELDS =
+  "number,title,headRefName,baseRefName,headRefOid,url,author,labels";
 
 export function detectForge(root: string): Forge {
   const host = originHost(root);
@@ -169,6 +173,12 @@ export function readPullList(
   return pulls.map((pull) => normalizeGh(pull));
 }
 
+export function githubSlug(remote: string): string | null {
+  const trimmed = remote.trim().replace(/\.git$/, "");
+  const match = /github\.com[:/]([^/\s]+\/[^/\s]+)$/.exec(trimmed);
+  return match?.[1] ?? null;
+}
+
 function originHost(root: string): string {
   const origin = tryGit(root, ["remote", "get-url", "origin"])?.trim();
   if (origin) return remoteHost(origin);
@@ -259,6 +269,7 @@ function normalizeGh(pull: GhPull): PullMeta {
     title: pull.title,
     headRefName: pull.headRefName,
     baseRefName: pull.baseRefName,
+    headOid: pull.headRefOid,
     url: pull.url,
     author: pull.author?.login,
     labels: (pull.labels ?? [])
@@ -279,6 +290,7 @@ function normalizeGlab(pull: GlabMr): PullMeta {
     title: pull.title,
     headRefName: pull.source_branch ?? "",
     baseRefName: pull.target_branch ?? "",
+    headOid: pull.sha,
     url: pull.web_url,
     author,
     labels: (pull.labels ?? [])

@@ -17,6 +17,7 @@ import { main, parseArgs } from "./cli.js";
 import { countChangedSpan, parseUnifiedDiff } from "./diff.js";
 import { readEvidence, writeEvidence } from "./evidence.js";
 import { writePackets } from "./packets.js";
+import { githubSlug } from "./forge.js";
 import { rankFindings } from "./rank.js";
 import { languageFor, parseSyntax } from "./syntax.js";
 import type { Graph } from "./types.js";
@@ -167,6 +168,70 @@ func loadUser() -> String {
     ["loadUser"],
   );
   assert.equal(swift.imports[0]?.spec, "Foundation");
+});
+
+test("github slugs come from github remotes only", () => {
+  assert.equal(
+    githubSlug("https://github.com/acme/widgets.git"),
+    "acme/widgets",
+  );
+  assert.equal(githubSlug("git@github.com:acme/widgets.git"), "acme/widgets");
+  assert.equal(githubSlug("https://gitlab.com/acme/widgets.git"), null);
+});
+
+test("a remote diff uses the commit object when that head is already local", () => {
+  const root = mkdtempSync(join(tmpdir(), "astroidal-remote-"));
+  try {
+    git(root, ["init", "-b", "main"]);
+    git(root, ["config", "user.email", "astroidal@example.com"]);
+    git(root, ["config", "user.name", "Astroidal"]);
+    mkdirSync(join(root, "src"));
+    writeFileSync(
+      join(root, "src", "auth.ts"),
+      "export function login() {\n  return 1\n}\nexport function extra() {\n  return 2\n}\n",
+    );
+    git(root, ["add", "."]);
+    git(root, ["commit", "-m", "init"]);
+    const oid = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+    const patch = `diff --git a/src/auth.ts b/src/auth.ts
+--- a/src/auth.ts
++++ b/src/auth.ts
+@@ -1,2 +1,2 @@
+ export function login() {
+-  return 1
++  return 3
+ }
+`;
+    const result = buildMap({
+      root,
+      notes: [],
+      commands: [],
+      units: [
+        {
+          id: "pr:12",
+          label: "PR 12",
+          pr: 12,
+          source: "remote-diff",
+          head: "feature",
+          headOid: oid,
+          files: parseUnifiedDiff(patch),
+        },
+      ],
+    });
+    const file = result.files.find((item) => item.path === "src/auth.ts");
+    assert.equal(file?.partial, false);
+    assert.match(file?.text ?? "", /function extra/);
+    assert.ok(
+      result.graph.nodes.some(
+        (node) => node.name === "extra" && node.path === "src/auth.ts",
+      ),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("exposure score stays inside 0 to 100", () => {

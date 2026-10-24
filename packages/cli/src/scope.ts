@@ -25,6 +25,7 @@ interface SelectedPull {
   url?: string;
   head: string;
   base: string;
+  headOid?: string;
   origin: "explicit" | "open" | "stack";
 }
 
@@ -171,6 +172,7 @@ function walkStack(
       url: meta?.url,
       head: branch,
       base,
+      headOid: meta?.headOid,
       origin: "stack",
     });
     if (!base || base === stop || base === branch || seen.has(base)) break;
@@ -262,6 +264,7 @@ function loadPull(
     source,
     base: pull.base,
     head: pull.head,
+    headOid: pull.headOid,
     files,
   };
 }
@@ -427,6 +430,7 @@ function toSelected(
     url: pull.url,
     head: pull.headRefName,
     base: pull.baseRefName,
+    headOid: pull.headOid,
     origin,
   };
 }

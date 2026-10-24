@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { changedLines, countChangedSpan, reconstructSide } from "./diff.js";
-import { tryGit } from "./git.js";
+import { githubSlug } from "./forge.js";
+import { ghAvailable, tryGh, tryGit } from "./git.js";
 import { isNoise } from "./noise.js";
 import { toPosix } from "./paths.js";
 import { readRepoFile, type ScopeResult } from "./scope.js";
@@ -444,9 +445,15 @@ function loadFile(
     return { text: "", oldText, partial: unit.source === "remote-diff" };
   }
   if (unit.source === "remote-diff") {
+    const oldText = reconstructSide(file.patch, "old");
+    const ref = unit.headOid || unit.head || "";
+    const fromGit = unit.headOid ? showAt(root, unit.headOid, file.path) : "";
+    if (fromGit) return { text: fromGit, oldText, partial: false };
+    const fromApi = readGithubFile(root, file.path, ref);
+    if (fromApi) return { text: fromApi, oldText, partial: false };
     return {
       text: reconstructSide(file.patch, "new"),
-      oldText: reconstructSide(file.patch, "old"),
+      oldText,
       partial: true,
     };
   }
@@ -473,6 +480,35 @@ function showAt(root: string, ref: string, path: string): string {
   if (!path || path === "/dev/null") return "";
   const spec = ref === "INDEX" ? `:${path}` : `${ref}:${path}`;
   return tryGit(root, ["show", spec]) ?? "";
+}
+
+function readGithubFile(
+  root: string,
+  path: string,
+  ref: string,
+): string | null {
+  if (!path || !ref || path === "/dev/null" || !ghAvailable()) return null;
+  const remote = tryGit(root, ["remote", "get-url", "origin"])?.trim();
+  const slug = remote ? githubSlug(remote) : null;
+  if (!slug) return null;
+  const encoded = path
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  const text = tryGh(root, [
+    "api",
+    "--method",
+    "GET",
+    "-H",
+    "Accept: application/vnd.github.raw",
+    `/repos/${slug}/contents/${encoded}?ref=${encodeURIComponent(ref)}`,
+  ]);
+  if (text == null) return null;
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length > 400_000 || trimmed.includes("\0"))
+    return null;
+  if (trimmed.startsWith("{") && /"message"\s*:/.test(trimmed)) return null;
+  return text;
 }
 
 function pairSymbols(

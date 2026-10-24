@@ -31,6 +31,7 @@ export interface ChangeUnit {
   source: "local" | "remote-diff";
   base?: string;
   head?: string;
+  headOid?: string;
   files: ParsedFile[];
 }
 
