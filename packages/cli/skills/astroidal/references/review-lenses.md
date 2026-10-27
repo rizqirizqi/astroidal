@@ -157,6 +157,9 @@ Object deleted while a signal is still connected, lambda connection with no cont
 
 ## Sources
 
+Credit for patterns folded into this catalog. Not a mandatory load list — the parent skill decides companions from the change.
+
+- [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) — trust boundaries, attack classes, and severity that require a concrete crossed boundary and result; load in guidance mode when the change is security-heavy.
 - [awesome-skills/code-review-skill](https://github.com/awesome-skills/code-review-skill) — language bug patterns, injection and authz, concurrency, and the universal failure modes (check-then-act, no-op writes, leaked resources).
 - [addyosmani/agent-skills, code-review-and-quality](https://github.com/addyosmani/agent-skills/blob/main/skills/code-review-and-quality/SKILL.md) — correctness, readability, architecture, security, and performance searched together; structural remedies; test and dependency discipline.
 - [mattpocock/skills, code-review](https://github.com/mattpocock/skills/blob/main/skills/engineering/code-review/SKILL.md) — spec and standards as separate passes, with project rules overriding a smell baseline.

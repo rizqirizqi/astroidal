@@ -12,7 +12,36 @@ description: >-
 
 Astroidal is the AI code review map, scorer, and helper. It draws the blast radius and scores what you can prove. Map the change, search it for real bugs, then rank the findings. The chart and the table live in files. The chat reply is a short prose summary a person can paste.
 
-The bug catalog is [references/review-lenses.md](references/review-lenses.md), next to this file. Read it before judging a finding. It is not in `.astroidal/`.
+The bug catalog is [references/review-lenses.md](references/review-lenses.md), next to this file. Read it before judging a finding. It is not in `.astroidal/`. That file is the only required reference under `references/`.
+
+## Companion skills
+
+Load companion skills only when the change warrants them. You decide from the bug map, the packets, and the Added lines — do not load every skill on the Sources list.
+
+Suggested companions:
+
+- Security-heavy change (authz, trust boundary, injection sink, secrets, crypto, tenant isolation): [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) in **guidance mode**. Prefer an installed `security-audit` skill on this machine; otherwise fetch or skim only the attack-class docs that match the stack. Do not run its full six-phase audit or write its report artifacts. Astroidal still owns `.astroidal/findings.json`, `rank`, and the chat reply.
+- Other Sources in the catalog are credit for patterns already folded into `review-lenses.md`. Reach for one only when that skill is installed and the change clearly needs a lens the catalog does not cover.
+
+Skip companions for a small, non-security diff when the catalog is enough.
+
+## Sub-agents
+
+Stay on one agent when the map is small: a single PR or local change, roughly under ~15 non-test Added-lines files, and one coherent area.
+
+Delegate with the platform Task / sub-agent tool when any of these hold:
+
+- The map covers **two or more pull requests** (batch, `--open`, or `--stack` with multiple PRs)
+- **~15 or more** non-test source files in Added lines, or the added lines span several unrelated areas
+- A security companion is in play **and** the security surface is large enough that one pass would skip files
+
+How to split:
+
+- One sub-agent per pull request in a multi-PR map, or per coherent area (auth, API, UI) when a single PR is large
+- Give each sub-agent the bug-map paths it owns, the matching packet leads, the catalog gate, and any companion skill it should use
+- Sub-agents return candidate findings only (severity, description, path, line, quote, recommendation, category, `pr` when known). They do not write `.astroidal/findings.json`, do not run `rank`, and do not comment on the PR
+
+The parent merges candidates, drops duplicates and anything that fails the gate, writes one `.astroidal/findings.json`, runs `rank` once, and owns the chat reply. A batch is still one merged map and one report — sub-agents parallelize the search, they do not produce separate reviews.
 
 Do not add Astroidal as a dependency. Do not edit `package.json`, lockfiles, `pyproject.toml`, `go.mod`, or `Cargo.toml` to install it.
 
@@ -25,13 +54,17 @@ Resolve the command in this order:
 
 If the package name cannot be downloaded, and the user pointed at a local checkout, run `npx --yes <path-to-the-astroidal-package>` or `node <path>/dist/cli.js`.
 
-Install the skill once per repository. This writes `.agents/skills/astroidal`, which Codex and other agents read:
+### Repo setup (do this before the first `graph`)
+
+People may install this skill with `npx skills add` or with `astroidal init`. Either way, before the first review in a repository, run init once so the repo is ready:
 
 ```bash
 npx --yes astroidal init
 ```
 
-Pass `--agent` to copy that same skill into one agent's own directory. Repeat it, or pass `all`.
+That adds `.astroidal/` to `.gitignore` when a `.gitignore` exists, and writes the install stamp used for refresh. Skip init when `.astroidal/` is already ignored and the skill is already present for the agents you need. Do not pass `--force` just because the skill was installed via `npx skills` — keep that copy unless the user asked to replace it.
+
+Pass `--agent` to copy the skill into one agent's own directory. Repeat it, or pass `all`.
 
 ```bash
 npx --yes astroidal init --agent cursor
@@ -51,7 +84,7 @@ A global install updates when a newer Astroidal runs `graph` or `rank`, as long 
 
 ## Choose the scope
 
-Run `graph` once. Read the scope note it prints. If that scope is wrong, rerun once with the flag below. Do not rerun after that.
+Run `graph` once (after repo setup above). Read the scope note it prints. If that scope is wrong, rerun once with the flag below. Do not rerun after that.
 
 | Ask                                                         | Command                                                                     |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -66,7 +99,7 @@ Run `graph` once. Read the scope note it prints. If that scope is wrong, rerun o
 | Staged changes only                                         | `npx --yes astroidal graph --staged`                                        |
 | Unstaged changes and untracked files                        | `npx --yes astroidal graph --unstaged`                                      |
 
-A batch is one merged map. Do not review the pull requests as separate reports.
+A batch is one merged map. Do not review the pull requests as separate reports. When the batch is large enough, use sub-agents for the search as above, then merge into one findings file.
 
 ## GitHub
 
@@ -88,7 +121,7 @@ Read, in order:
 6. `.astroidal/packets/correctness.md`
 7. `references/review-lenses.md` next to this skill
 
-Apply the gate, the spec pass, and the standards pass in the catalog. Then apply each language section that matches a file in Added lines. Skip the other language sections.
+Apply the gate, the spec pass, and the standards pass in the catalog. Then apply each language section that matches a file in Added lines. Skip the other language sections. Load a companion skill only when the change warrants it. Split the search across sub-agents when the Sub-agents rules above say to.
 
 Cover every changed path in the bug map. Start with the **Added lines** section. That section is the change, one block per pull request. A symbol excerpt can be blank when the diff was fetched remotely, and on a stack it is only the tip. A blank excerpt is missing context, not an empty change.
 
