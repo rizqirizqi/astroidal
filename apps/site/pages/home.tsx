@@ -88,7 +88,7 @@ function Hero() {
             <div className="overflow-hidden rounded-2xl border border-white/15 bg-[#0C111C] shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
               <div className="flex items-center justify-between gap-3 border-b border-white/15 px-4 py-3">
                 <p className="font-brand-secondary text-[11px] tracking-[0.16em] text-brand-primary uppercase">
-                  constellation.html
+                  The constellation
                 </p>
                 <p className="rounded-full border border-[#FFB020]/70 px-2.5 py-1 font-brand-secondary text-[10px] tracking-[0.12em] text-[#FFB020] uppercase">
                   Full review
@@ -98,16 +98,13 @@ function Hero() {
                 controls
                 playsInline
                 preload="none"
-                poster="/assets/preview-poster.jpg?v=2"
+                poster="/assets/preview-poster.jpg?v=4"
                 className="aspect-[1600/868] w-full bg-brand-bg"
-                aria-label="Recording of an Astroidal constellation, scored 9, Fix first"
+                aria-label="Recording of an Astroidal constellation, scored 11, Fix first"
               >
-                <source src="/assets/preview.mp4" type="video/mp4" />
+                <source src="/assets/preview.mp4?v=4" type="video/mp4" />
               </video>
             </div>
-            <figcaption className="mt-3 font-brand-secondary text-xs leading-5 text-[#A8B3C7]">
-              A recorded review. Fifty-four seconds, no narration.
-            </figcaption>
           </figure>
         </div>
       </div>
