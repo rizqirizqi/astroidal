@@ -1340,6 +1340,11 @@ test("graph refreshes an unmodified global skill and leaves edits and project co
   const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
   const previous = process.cwd();
   const previousHome = process.env.HOME;
+  const currentVersion = (
+    JSON.parse(
+      readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8"),
+    ) as { version: string }
+  ).version;
   try {
     process.chdir(root);
     process.env.HOME = home;
@@ -1355,9 +1360,14 @@ test("graph refreshes an unmodified global skill and leaves edits and project co
     const updated = captureLog(() => {
       assert.equal(main(["graph"]), 0);
     });
-    assert.match(updated, /Updated Astroidal skill 0\.0\.1 → 0\.1\.0\./);
-    assert.equal(stampVersion(globalSkill), "0.1.0");
-    assert.equal(stampVersion(agentsSkill), "0.1.0");
+    assert.match(
+      updated,
+      new RegExp(
+        `Updated Astroidal skill 0\\.0\\.1 → ${currentVersion.replaceAll(".", "\\.")}\\.`,
+      ),
+    );
+    assert.equal(stampVersion(globalSkill), currentVersion);
+    assert.equal(stampVersion(agentsSkill), currentVersion);
     assert.equal(stampVersion(projectSkill), "0.0.1");
 
     writeFileSync(join(globalSkill, "SKILL.md"), "custom\n");
@@ -1380,8 +1390,8 @@ test("graph refreshes an unmodified global skill and leaves edits and project co
     });
     assert.doesNotMatch(adopted, /Updated Astroidal skill/);
     assert.doesNotMatch(adopted, /init --force/);
-    assert.equal(stampVersion(globalSkill), "0.1.0");
-    assert.equal(stampVersion(agentsSkill), "0.1.0");
+    assert.equal(stampVersion(globalSkill), currentVersion);
+    assert.equal(stampVersion(agentsSkill), currentVersion);
 
     rewriteStamp(globalSkill, "9.0.0");
     rewriteStamp(agentsSkill, "9.0.0");

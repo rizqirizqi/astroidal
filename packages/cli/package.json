@@ -1,6 +1,6 @@
 {
   "name": "astroidal",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI code review map, scorer, and helper. Draws the blast radius, hands an agent a bug map, and scores what survives. Run with npx, without adding a dependency.",
   "type": "module",
   "bin": {
