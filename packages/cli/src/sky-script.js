@@ -64,14 +64,31 @@
     window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var stars = [];
+  var minorStars = [];
   var random = mulberry32(42);
-  for (var star = 0; star < 110; star += 1) {
+  for (var star = 0; star < 140; star += 1) {
     stars.push({
-      x: (random() - 0.5) * 2200,
-      y: (random() - 0.5) * 1400,
+      x: (random() - 0.5) * 3600,
+      y: (random() - 0.5) * 2400,
       s: random() * 1.3 + 0.25,
       a: random(),
     });
+  }
+
+  function seedMinorStars() {
+    minorStars = [];
+    var width = Math.max(1, canvas.clientWidth || 800);
+    var height = Math.max(1, canvas.clientHeight || 600);
+    var count = Math.max(420, Math.floor((width * height) / 1400));
+    var dustRandom = mulberry32(84);
+    for (var dust = 0; dust < count; dust += 1) {
+      minorStars.push({
+        x: dustRandom() * width,
+        y: dustRandom() * height,
+        s: dustRandom() * 0.7 + 0.12,
+        a: dustRandom() * 0.6,
+      });
+    }
   }
 
   function resize() {
@@ -79,6 +96,7 @@
     var ratio = window.devicePixelRatio || 1;
     canvas.width = Math.max(1, Math.floor(bounds.width * ratio));
     canvas.height = Math.max(1, Math.floor(bounds.height * ratio));
+    seedMinorStars();
     layout();
     if (!moved) fitCamera();
     draw();
@@ -605,6 +623,13 @@
     wash.addColorStop(1, "rgba(5,7,12,0.45)");
     context.fillStyle = wash;
     context.fillRect(0, 0, width, height);
+    minorStars.forEach(function (star) {
+      context.globalAlpha = 0.1 + star.a * 0.32;
+      context.fillStyle = "#E8EEF8";
+      context.beginPath();
+      context.arc(star.x, star.y, star.s, 0, Math.PI * 2);
+      context.fill();
+    });
     stars.forEach(function (star) {
       var point = toScreen(star.x, star.y);
       context.globalAlpha = 0.2 + star.a * 0.55;
@@ -795,6 +820,43 @@
     tip.style.left = left + "px";
     tip.style.top = Math.max(8, y + 14) + "px";
     tip.textContent = node.name + " · " + node.path + ":" + node.line;
+  }
+
+  function openPanel(name) {
+    var tabs = document.querySelectorAll(".aside-tabs [data-panel]");
+    var panels = document.querySelectorAll('.aside-panels [role="tabpanel"]');
+    tabs.forEach(function (tab) {
+      var on = tab.getAttribute("data-panel") === name;
+      tab.classList.toggle("is-on", on);
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    panels.forEach(function (panel) {
+      var on = panel.id === "panel-" + name;
+      panel.hidden = !on;
+    });
+  }
+
+  function revealLensDetail() {
+    openPanel("lens");
+    if (!detail) return;
+    var target =
+      detail.querySelector(".diff-review .is-mark") ||
+      detail.querySelector(".diff-review") ||
+      detail;
+    if (target && target.scrollIntoView) {
+      target.scrollIntoView({
+        block: "nearest",
+        behavior: reduced ? "auto" : "smooth",
+      });
+    }
+    var panels = document.querySelector(".aside-panels");
+    if (panels && detail.getBoundingClientRect) {
+      var top =
+        detail.getBoundingClientRect().top -
+        panels.getBoundingClientRect().top +
+        panels.scrollTop;
+      panels.scrollTop = Math.max(0, top - 12);
+    }
   }
 
   function showDetail(node) {
@@ -1056,6 +1118,7 @@
   function focusNode(node) {
     selected = node;
     showDetail(node);
+    revealLensDetail();
     moved = true;
     camera.x = -node.x;
     camera.y = -node.y;
@@ -1122,6 +1185,7 @@
       if (selected !== node) {
         selected = node;
         showDetail(node);
+        revealLensDetail();
         scheduleDraw();
       }
       return;
@@ -1204,6 +1268,244 @@
       scheduleDraw();
     });
 
+  var reviewPanel = document.getElementById("review-panel");
+  var impactPanel = document.getElementById("impact-panel");
+  var alertsPanel = document.getElementById("alerts-panel");
+  var unitFold = document.getElementById("unit-fold");
+  var unitsById = {};
+  (data.units || []).forEach(function (unit) {
+    unitsById[unit.id] = unit;
+  });
+  var impactByUnit = {};
+  ((data.impact && data.impact.byUnit) || []).forEach(function (unit) {
+    impactByUnit[unit.unitId] = unit;
+  });
+
+  function verdictLabel(verdict) {
+    if (verdict === "passed") return "Passed";
+    if (verdict === "review") return "Review";
+    return "Fix first";
+  }
+
+  function clampScore(value) {
+    return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function astroidPath(cx, cy, maxR, right, top, left, bottom) {
+    var commands = [];
+    var steps = 128;
+    for (var index = 0; index <= steps; index += 1) {
+      var turn = (index / steps) * Math.PI * 2;
+      var cosine = Math.cos(turn);
+      var sine = Math.sin(turn);
+      var horizontal = (cosine >= 0 ? right : left) / 100;
+      var vertical = (sine >= 0 ? bottom : top) / 100;
+      var x =
+        cx +
+        Math.sign(cosine) * Math.pow(Math.abs(cosine), 3) * horizontal * maxR;
+      var y =
+        cy + Math.sign(sine) * Math.pow(Math.abs(sine), 3) * vertical * maxR;
+      commands.push(
+        (index === 0 ? "M" : "L") + x.toFixed(1) + " " + y.toFixed(1),
+      );
+    }
+    return commands.join(" ") + " Z";
+  }
+
+  function scoreCardMarkup(score) {
+    if (!score) return "";
+    var label = verdictLabel(score.verdict);
+    var agent =
+      score.agentScore == null
+        ? ""
+        : '<p class="quiet">Agent score ' + score.agentScore + "</p>";
+    return (
+      '<section class="verdict verdict-' +
+      escapeHtml(score.verdict) +
+      '" aria-label="Astroidal score ' +
+      score.value +
+      ", " +
+      label +
+      '"><p class="eyebrow">Astroidal score</p><p class="verdict-row"><b>' +
+      score.value +
+      '</b><span class="verdict-label">' +
+      escapeHtml(label) +
+      '</span></p><p class="quiet">' +
+      escapeHtml(score.reason || "") +
+      "</p>" +
+      agent +
+      "</section>"
+    );
+  }
+
+  function impactSurfaceMarkup(impact) {
+    if (!impact) return "";
+    var blast = clampScore(impact.blastRadius);
+    var complexity = clampScore(impact.complexityDelta);
+    var security = clampScore(impact.securityExposure);
+    var performance = clampScore(impact.performanceImpact);
+    var guide = astroidPath(160, 156, 108, 100, 100, 100, 100);
+    var value = astroidPath(
+      160,
+      156,
+      108,
+      blast,
+      complexity,
+      security,
+      performance,
+    );
+    var complexityRaw =
+      typeof impact.complexityRaw === "number" ? impact.complexityRaw : 0;
+    return (
+      '<svg class="surface" viewBox="0 0 320 312" role="img" aria-label="Impact surface. Blast ' +
+      blast +
+      ". Complexity " +
+      signed(complexityRaw) +
+      ". Security " +
+      security +
+      ". Performance " +
+      performance +
+      '.">' +
+      '<defs><radialGradient id="astroid-fill" cx="50%" cy="50%" r="65%"><stop offset="0%" stop-color="#7F00FF" stop-opacity="0.45" /><stop offset="78%" stop-color="#00F2FE" stop-opacity="0.16" /></radialGradient></defs>' +
+      '<path class="guide" d="' +
+      guide +
+      '" />' +
+      '<line class="axis" x1="160" y1="48" x2="160" y2="264" />' +
+      '<line class="axis" x1="52" y1="156" x2="268" y2="156" />' +
+      '<path class="value" d="' +
+      value +
+      '" fill="url(#astroid-fill)" />' +
+      '<circle cx="' +
+      (160 + (blast / 100) * 108).toFixed(1) +
+      '" cy="156" r="3.5" fill="#00F2FE" />' +
+      '<circle cx="160" cy="' +
+      (156 - (complexity / 100) * 108).toFixed(1) +
+      '" r="3.5" fill="#D2B4FF" />' +
+      '<circle cx="' +
+      (160 - (security / 100) * 108).toFixed(1) +
+      '" cy="156" r="3.5" fill="#FFB020" />' +
+      '<circle cx="160" cy="' +
+      (156 + (performance / 100) * 108).toFixed(1) +
+      '" r="3.5" fill="#9AF7FF" />' +
+      '<text class="axis-name" x="160" y="22" text-anchor="middle">Complexity</text>' +
+      '<text class="axis-value" x="160" y="40" text-anchor="middle" fill="#D2B4FF">' +
+      signed(complexityRaw) +
+      "</text>" +
+      '<text class="axis-name" x="276" y="150" text-anchor="start">Blast</text>' +
+      '<text class="axis-value" x="276" y="168" text-anchor="start" fill="#00F2FE">' +
+      blast +
+      "</text>" +
+      '<text class="axis-name" x="44" y="150" text-anchor="end">Security</text>' +
+      '<text class="axis-value" x="44" y="168" text-anchor="end" fill="#FFB020">' +
+      security +
+      "</text>" +
+      '<text class="axis-name" x="160" y="286" text-anchor="middle">Performance</text>' +
+      '<text class="axis-value" x="160" y="304" text-anchor="middle" fill="#9AF7FF">' +
+      performance +
+      "</text></svg>"
+    );
+  }
+
+  function alertsMarkup(list) {
+    if (!list || list.length === 0)
+      return '<p class="quiet">No cusp alerts on this map.</p>';
+    return (
+      '<ol class="alerts">' +
+      list
+        .map(function (finding) {
+          var agent =
+            finding.agentScore == null
+              ? ""
+              : ' <span class="agent-score">agent ' +
+                finding.agentScore +
+                "</span>";
+          var line =
+            finding.line == null || finding.line === ""
+              ? ""
+              : ":" + finding.line;
+          return (
+            '<li class="sev-' +
+            escapeHtml(finding.severity) +
+            '"><strong>' +
+            escapeHtml(finding.id) +
+            "</strong> <em>" +
+            escapeHtml(finding.severity) +
+            "</em>" +
+            agent +
+            " " +
+            escapeHtml(finding.description) +
+            '<button type="button" class="alert-path" data-alert-path="' +
+            escapeHtml(finding.path) +
+            '" data-alert-line="' +
+            (finding.line == null ? "" : finding.line) +
+            '" aria-label="Open ' +
+            escapeHtml(finding.path) +
+            ' in the lens">' +
+            escapeHtml(finding.path) +
+            line +
+            "</button></li>"
+          );
+        })
+        .join("") +
+      "</ol>"
+    );
+  }
+
+  function bindAlertPaths(root) {
+    if (!root) return;
+    root.querySelectorAll("[data-alert-path]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var line = Number(button.getAttribute("data-alert-line"));
+        var node = nodeForAlert(
+          button.getAttribute("data-alert-path") || "",
+          line,
+        );
+        if (!node) return;
+        focusNode(node);
+      });
+    });
+  }
+
+  function applyUnitPanel() {
+    var unit = filter === "all" ? null : unitsById[filter];
+    var score = unit && unit.score ? unit.score : data.score;
+    var impact =
+      unit && impactByUnit[unit.id] ? impactByUnit[unit.id] : data.impact || {};
+    var list =
+      unit == null
+        ? findings
+        : findings.filter(function (finding) {
+            return finding.pr === unit.label;
+          });
+    if (reviewPanel) reviewPanel.innerHTML = scoreCardMarkup(score);
+    if (impactPanel) impactPanel.innerHTML = impactSurfaceMarkup(impact);
+    if (alertsPanel) {
+      alertsPanel.innerHTML = alertsMarkup(list);
+      bindAlertPaths(alertsPanel);
+    }
+    var findingsCount = document.getElementById("findings-count");
+    if (findingsCount) {
+      findingsCount.textContent = String(list.length);
+      findingsCount.hidden = list.length === 0;
+    }
+    if (unitFold) unitFold.hidden = filter !== "all";
+    applySymbolFilter();
+  }
+
+  document.querySelectorAll(".aside-tabs [data-panel]").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      openPanel(tab.getAttribute("data-panel") || "score");
+    });
+  });
+
   document.querySelectorAll("[data-filter]").forEach(function (button) {
     button.addEventListener("click", function () {
       filter = button.getAttribute("data-filter") || "all";
@@ -1212,6 +1514,7 @@
         item.classList.toggle("is-on", on);
         item.setAttribute("aria-pressed", on ? "true" : "false");
       });
+      applyUnitPanel();
       scheduleDraw();
     });
   });
@@ -1231,22 +1534,7 @@
     });
   });
 
-  document.querySelectorAll("[data-alert-path]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      var line = Number(button.getAttribute("data-alert-line"));
-      var node = nodeForAlert(
-        button.getAttribute("data-alert-path") || "",
-        line,
-      );
-      if (!node) return;
-      focusNode(node);
-      if (detail && detail.scrollIntoView)
-        detail.scrollIntoView({
-          block: "nearest",
-          behavior: reduced ? "auto" : "smooth",
-        });
-    });
-  });
+  bindAlertPaths(alertsPanel || document);
 
   var symbolList = document.getElementById("symbol-list");
   var symbolTree = document.getElementById("symbol-tree");
@@ -1282,12 +1570,16 @@
     document
       .querySelectorAll(".symbols [data-index]")
       .forEach(function (button) {
+        var index = Number(button.getAttribute("data-index"));
+        var node = nodes[index];
+        var unitOk = !node || filter === "all" || isVisible(node);
         var haystack = (
           button.getAttribute("data-search") ||
           button.textContent ||
           ""
         ).toLowerCase();
-        button.hidden = query.length > 0 && haystack.indexOf(query) === -1;
+        var queryOk = query.length === 0 || haystack.indexOf(query) !== -1;
+        button.hidden = !(unitOk && queryOk);
       });
     document
       .querySelectorAll("#symbol-tree .tree-file")

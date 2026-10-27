@@ -2,36 +2,48 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { scoreReview, verdictLabel } from "./analyze.js";
-import type { Graph, GraphNode, ReviewScore } from "./types.js";
+import type {
+  Graph,
+  GraphNode,
+  GraphUnit,
+  RankedFinding,
+  ReviewScore,
+} from "./types.js";
 
 export function renderConstellation(graph: Graph): string {
   const payload = JSON.stringify(graph).replaceAll("<", "\\u003c");
   const script = loadSky();
+  const impact = graph.impact;
+  const review = reviewOf(graph);
   const units = graph.units
-    .map(
-      (unit) =>
-        `<button type="button" data-filter="${escapeHtml(unit.id)}" aria-pressed="false">${escapeHtml(unit.label)}</button>`,
-    )
+    .map((unit) => batchUnitButton(graph, unit))
     .join("");
+  const allTab = batchFilterButton({
+    id: "all",
+    label: "All",
+    score: review,
+    findings: graph.findings.length,
+    pressed: true,
+  });
   const changed = graph.nodes
     .map((node, index) => ({ node, index }))
     .filter((entry) => entry.node.role === "changed")
     .slice(0, 80);
   const index = changed.map((entry) => symbolButton(entry, false)).join("");
   const tree = symbolTree(changed);
-  const alerts =
-    graph.findings.length === 0
-      ? '<p class="quiet">No cusp alerts on this map.</p>'
-      : `<ol class="alerts">${graph.findings.map((finding) => `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em>${finding.agentScore == null ? "" : ` <span class="agent-score">agent ${finding.agentScore}</span>`} ${escapeHtml(finding.description)}<button type="button" class="alert-path" data-alert-path="${escapeHtml(finding.path)}" data-alert-line="${finding.line ?? ""}" aria-label="Open ${escapeHtml(finding.path)} in the lens">${escapeHtml(finding.path)}${finding.line == null ? "" : `:${finding.line}`}</button></li>`).join("")}</ol>`;
+  const alerts = alertsMarkup(graph.findings);
   const unitScores =
     graph.impact.byUnit.length > 1
-      ? `<details class="unit-fold"><summary>${graph.impact.byUnit.length} pull requests</summary><ul class="units">${graph.impact.byUnit
+      ? `<details class="unit-fold" id="unit-fold"><summary>${graph.impact.byUnit.length} pull requests</summary><ul class="units">${graph.impact.byUnit
           .map((unit) => {
             const score = graph.units.find(
               (item) => item.id === unit.unitId,
             )?.score;
             const verdict = score ? ` · ${verdictLabel(score.verdict)}` : "";
-            return `<li><span>${escapeHtml(unit.label)}${verdict}</span><em>blast ${unit.blastRadius} · complexity ${signed(unit.complexityRaw)} · security ${unit.securityExposure} · perf ${unit.performanceImpact}</em></li>`;
+            const findings = graph.findings.filter(
+              (finding) => finding.pr === unit.label,
+            ).length;
+            return `<li><span>${escapeHtml(unit.label)}${verdict}${score ? ` · ${score.value}` : ""}</span><em>blast ${unit.blastRadius} · complexity ${signed(unit.complexityRaw)} · security ${unit.securityExposure} · perf ${unit.performanceImpact} · ${findings} finding${findings === 1 ? "" : "s"}</em></li>`;
           })
           .join("")}</ul></details>`
       : "";
@@ -42,8 +54,6 @@ export function renderConstellation(graph: Graph): string {
       : escapeHtml(
           graph.units.map((unit) => unit.label).join(", ") || "local changes",
         );
-  const impact = graph.impact;
-  const review = reviewOf(graph);
   const verdictText = verdictLabel(review.verdict);
   const shareLine = `Astroidal ${review.value} · ${verdictText} on ${graph.repoName}. The AI code review map — blast radius, bug map, and a score. npx --yes astroidal graph`;
 
@@ -105,7 +115,7 @@ export function renderConstellation(graph: Graph): string {
     .tier-lite { border-color: rgba(0, 242, 254, 0.7); color: var(--cyan); }
     .tier-trivial { color: var(--muted); }
     .scope { margin: 0; color: var(--muted); font-size: 13px; }
-    .batch { display: flex; gap: 8px; overflow-x: auto; padding: 0 24px 12px; scrollbar-width: thin; }
+    .batch { display: flex; gap: 8px; overflow-x: auto; padding: 0 24px 12px; scrollbar-width: thin; align-items: stretch; }
     .batch button, .lens-controls button, .view-toggle button, .symbols button, summary {
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.02);
@@ -114,9 +124,26 @@ export function renderConstellation(graph: Graph): string {
       transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
     }
     .batch button { flex: 0 0 auto; }
+    .batch .batch-unit {
+      display: grid;
+      gap: 2px;
+      justify-items: start;
+      border-radius: 14px;
+      padding: 8px 12px;
+      min-width: 148px;
+      text-align: left;
+      line-height: 1.25;
+    }
+    .batch .batch-label { font-weight: 560; }
+    .batch .batch-score { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .batch .batch-findings { color: var(--muted); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; }
+    .batch .verdict-fix .batch-score { color: var(--amber); }
+    .batch .verdict-passed .batch-score { color: var(--cyan); }
+    .batch .verdict-review .batch-score { color: var(--violet-ink); }
     .batch button:hover, .lens-controls button:hover, .view-toggle button:hover, .symbols button:hover, summary:hover { border-color: rgba(0, 242, 254, 0.55); }
     .batch button.is-on { border-color: var(--cyan); color: var(--cyan); background: rgba(0, 242, 254, 0.08); }
-    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, 520px); min-height: 0; }
+    .batch .batch-unit.is-on .batch-findings { color: rgba(0, 242, 254, 0.78); }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(440px, 560px); min-height: 0; }
     .sky, aside { min-height: 0; }
     .sky { position: relative; min-width: 0; outline: none; display: flex; flex-direction: column; }
     .sky:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
@@ -134,7 +161,43 @@ export function renderConstellation(graph: Graph): string {
     .hint { margin: 0; max-width: 28ch; color: var(--muted); font-size: 11px; letter-spacing: 0.04em; line-height: 1.45; text-align: right; }
     .lens-controls { display: flex; gap: 8px; }
     .lens-controls button { border-radius: 10px; min-height: 36px; }
-    aside { overflow: auto; border-left: 1px solid var(--line); padding: 20px 20px 28px; background: var(--panel); scroll-padding-top: 16px; }
+    aside { overflow: hidden; border-left: 1px solid var(--line); padding: 0; background: var(--panel); display: flex; min-height: 0; }
+    .aside-shell { display: grid; grid-template-columns: minmax(0, 1fr) 56px; flex: 1; min-height: 0; width: 100%; }
+    .aside-tabs { display: flex; flex-direction: column; gap: 6px; padding: 12px 8px; border-left: 1px solid var(--line); background: rgba(0, 0, 0, 0.18); }
+    .aside-tabs button {
+      position: relative;
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 12px;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+      transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+    }
+    .aside-tabs button svg { width: 18px; height: 18px; display: block; }
+    .aside-tabs button:hover { border-color: rgba(0, 242, 254, 0.4); color: var(--ink); }
+    .aside-tabs button.is-on { border-color: var(--cyan); color: var(--cyan); background: rgba(0, 242, 254, 0.08); }
+    .aside-tabs .tab-count {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      min-width: 1.15em;
+      padding: 0 4px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 9px;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+    .aside-tabs button.is-on .tab-count { border-color: rgba(0, 242, 254, 0.45); color: var(--cyan); }
+    .aside-panels { min-height: 0; overflow: auto; padding: 16px 18px 24px; scroll-padding-top: 16px; }
+    .aside-panels > [role="tabpanel"][hidden] { display: none !important; }
+    .panel-stack { display: grid; gap: 4px; }
     h2 { margin: 0 0 12px; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
     .verdict { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0 0 18px; }
     .verdict-fix { border-color: rgba(255, 176, 32, 0.7); }
@@ -173,7 +236,7 @@ export function renderConstellation(graph: Graph): string {
     .symbol-meta .add { color: #7ee787; }
     .symbol-meta .del { color: #ff9b94; }
     .symbol-meta .cx, .symbol-meta em { color: var(--violet-ink); font-style: normal; }
-    #detail { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0 0 20px; background: rgba(255, 255, 255, 0.03); }
+    #detail { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0; background: rgba(255, 255, 255, 0.03); }
     #detail h2 { color: var(--ink); letter-spacing: -0.03em; text-transform: none; font-size: 22px; margin: 4px 0; }
     #detail .eyebrow { margin-bottom: 4px; }
     #detail pre { white-space: pre-wrap; margin: 10px 0 0; font: 12px/1.5 "JetBrains Mono", ui-monospace, monospace; background: rgba(0, 0, 0, 0.28); padding: 10px; border-radius: 10px; }
@@ -181,7 +244,7 @@ export function renderConstellation(graph: Graph): string {
     .diff-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); }
     .diff-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 560; }
     .diff-note, .diff-empty { margin: 0; padding: 8px 10px; color: var(--muted); font-size: 12px; }
-    .diff-body { max-height: min(68vh, 640px); overflow: auto; background: #070b12; }
+    .diff-body { max-height: min(62vh, 720px); overflow: auto; background: #070b12; }
     .diff-table { width: max-content; min-width: 100%; border-collapse: collapse; font: 12px/1.55 "JetBrains Mono", ui-monospace, monospace; }
     .diff-table td { padding: 0; vertical-align: top; }
     .diff-table .ln, .diff-table .sign { color: #6d7c93; background: rgba(0, 0, 0, 0.28); user-select: none; text-align: right; }
@@ -231,11 +294,14 @@ export function renderConstellation(graph: Graph): string {
       header, .meta { align-items: flex-start; flex-direction: column; justify-items: start; }
       main { grid-template-columns: 1fr; }
       .sky { height: 72vh; }
-      aside { border-left: 0; border-top: 1px solid var(--line); }
+      aside { border-left: 0; border-top: 1px solid var(--line); min-height: 70vh; }
+      .aside-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+      .aside-tabs { flex-direction: row; justify-content: center; overflow-x: auto; border-left: 0; border-top: 1px solid var(--line); padding: 8px; }
+      .aside-tabs button { flex: 0 0 auto; }
       .hint { display: none; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .batch button, .lens-controls button, .view-toggle button, .symbols button, summary { transition: none; }
+      .batch button, .aside-tabs button, .lens-controls button, .view-toggle button, .symbols button, summary { transition: none; }
       .mark { filter: none; }
     }
   </style>
@@ -258,7 +324,7 @@ export function renderConstellation(graph: Graph): string {
     </div>
   </header>
   <div class="batch" role="toolbar" aria-label="Batch">
-    <button type="button" class="is-on" data-filter="all" aria-pressed="true">All</button>${units}
+    ${allTab}${units}
   </div>
   <main>
     <section class="sky" tabindex="0" aria-label="Change map. Arrow keys move the map. Plus and minus lens in and out.">
@@ -274,31 +340,49 @@ export function renderConstellation(graph: Graph): string {
         <p class="hint">A cloud is a directory. Violet is a named group. A line is an import or a call.</p>
       </div>
     </section>
-    <aside aria-label="Lens">
-      ${scoreCard(review)}
-      <h2>Impact surface</h2>
-      ${impactSurface(impact)}
-      <ul class="legend">
-        <li><i class="shape logic" aria-hidden="true"></i> Logic <b>${countSpectral(graph.nodes, "logic")}</b></li>
-        <li><i class="shape contract" aria-hidden="true"></i> Contract <b>${countSpectral(graph.nodes, "contract")}</b></li>
-        <li><i class="shape text" aria-hidden="true"></i> Text <b>${countSpectral(graph.nodes, "text")}</b></li>
-        <li><i class="shape orbit" aria-hidden="true"></i> Orbit</li>
-      </ul>
-      ${unitScores}
-      <div id="detail"><p class="eyebrow">Lens</p><p>Select a star. Click it again, or the empty sky, to clear it.</p></div>
-      <h2>Cusp alerts</h2>
-      ${alerts}
-      <div class="symbol-head">
-        <h2>Changed symbols</h2>
-        <div class="view-toggle" role="group" aria-label="Changed symbols view">
-          <button type="button" id="view-tree" class="is-on" aria-pressed="true">Tree</button>
-          <button type="button" id="view-list" aria-pressed="false">List</button>
+    <aside aria-label="Review panels">
+      <div class="aside-shell">
+        <div class="aside-panels">
+          <section id="panel-score" class="panel-stack" role="tabpanel" aria-labelledby="tab-score">
+            <div id="review-panel">${scoreCard(review)}</div>
+            <h2>Impact surface</h2>
+            <div id="impact-panel">${impactSurface(impact)}</div>
+            <ul class="legend">
+              <li><i class="shape logic" aria-hidden="true"></i> Logic <b>${countSpectral(graph.nodes, "logic")}</b></li>
+              <li><i class="shape contract" aria-hidden="true"></i> Contract <b>${countSpectral(graph.nodes, "contract")}</b></li>
+              <li><i class="shape text" aria-hidden="true"></i> Text <b>${countSpectral(graph.nodes, "text")}</b></li>
+              <li><i class="shape orbit" aria-hidden="true"></i> Orbit</li>
+            </ul>
+            ${unitScores}
+          </section>
+          <section id="panel-findings" class="panel-stack" role="tabpanel" aria-labelledby="tab-findings" hidden>
+            <h2>Cusp alerts</h2>
+            <div id="alerts-panel">${alerts}</div>
+          </section>
+          <section id="panel-lens" class="panel-stack" role="tabpanel" aria-labelledby="tab-lens" hidden>
+            <div id="detail"><p class="eyebrow">Lens</p><p>Select a star. Click it again, or the empty sky, to clear it.</p></div>
+          </section>
+          <section id="panel-symbols" class="panel-stack" role="tabpanel" aria-labelledby="tab-symbols" hidden>
+            <div class="symbol-head">
+              <h2>Changed symbols</h2>
+              <div class="view-toggle" role="group" aria-label="Changed symbols view">
+                <button type="button" id="view-tree" class="is-on" aria-pressed="true">Tree</button>
+                <button type="button" id="view-list" aria-pressed="false">List</button>
+              </div>
+            </div>
+            <input id="symbol-filter" class="finder" type="search" placeholder="Filter symbols" aria-label="Filter symbols">
+            <div class="index symbols" id="symbol-list" hidden>${index || '<p class="quiet">No symbols in this map.</p>'}</div>
+            ${tree}
+            <p id="index-empty" class="quiet" hidden>No symbol matches.</p>
+          </section>
         </div>
+        <nav class="aside-tabs" role="tablist" aria-orientation="vertical" aria-label="Review sections">
+          <button type="button" role="tab" id="tab-score" class="is-on" data-panel="score" aria-controls="panel-score" aria-selected="true" aria-label="Score" title="Score">${tabIcon("score")}</button>
+          <button type="button" role="tab" id="tab-findings" data-panel="findings" aria-controls="panel-findings" aria-selected="false" aria-label="Findings" title="Findings">${tabIcon("findings")}${graph.findings.length > 0 ? `<span class="tab-count" id="findings-count">${graph.findings.length}</span>` : `<span class="tab-count" id="findings-count" hidden>0</span>`}</button>
+          <button type="button" role="tab" id="tab-lens" data-panel="lens" aria-controls="panel-lens" aria-selected="false" aria-label="Lens" title="Lens">${tabIcon("lens")}</button>
+          <button type="button" role="tab" id="tab-symbols" data-panel="symbols" aria-controls="panel-symbols" aria-selected="false" aria-label="Symbols" title="Symbols">${tabIcon("symbols")}</button>
+        </nav>
       </div>
-      <input id="symbol-filter" class="finder" type="search" placeholder="Filter symbols" aria-label="Filter symbols">
-      <div class="index symbols" id="symbol-list" hidden>${index || '<p class="quiet">No symbols in this map.</p>'}</div>
-      ${tree}
-      <p id="index-empty" class="quiet" hidden>No symbol matches.</p>
     </aside>
   </main>
   <script type="application/json" id="astroidal-data">${payload}</script>
@@ -319,6 +403,61 @@ function reviewOf(graph: Graph): ReviewScore {
     files: graph.summary.files,
     symbols: graph.summary.symbols,
   });
+}
+
+function tabIcon(kind: "score" | "findings" | "lens" | "symbols"): string {
+  if (kind === "score")
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3 14.8 9.2 21.5 10 16.6 14.6 18 21.3 12 18 6 21.3 7.4 14.6 2.5 10l6.7-.8L12 3Z"/></svg>';
+  if (kind === "findings")
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3 22 20H2L12 3Z"/><path d="M12 10v5"/><circle cx="12" cy="17.5" r="0.8" fill="currentColor" stroke="none"/></svg>';
+  if (kind === "lens")
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16.2 16.2 4.3 4.3"/><circle cx="11" cy="11" r="2.2"/></svg>';
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 5h11M8 12h11M8 19h11"/><circle cx="4.5" cy="5" r="1.2" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="4.5" cy="19" r="1.2" fill="currentColor" stroke="none"/></svg>';
+}
+
+function batchUnitButton(graph: Graph, unit: GraphUnit): string {
+  const findings = graph.findings.filter(
+    (finding) => finding.pr === unit.label,
+  ).length;
+  return batchFilterButton({
+    id: unit.id,
+    label: unit.label,
+    score: unit.score,
+    findings,
+    pressed: false,
+  });
+}
+
+function batchFilterButton(input: {
+  id: string;
+  label: string;
+  score?: ReviewScore;
+  findings: number;
+  pressed: boolean;
+}): string {
+  const score = input.score;
+  const verdict = score ? verdictLabel(score.verdict) : "";
+  const scoreLine = score
+    ? `<span class="batch-score">${score.value} · ${escapeHtml(verdict)}</span>`
+    : "";
+  const findingLine = `<span class="batch-findings">${input.findings} finding${input.findings === 1 ? "" : "s"}</span>`;
+  const verdictClass = score ? ` verdict-${score.verdict}` : "";
+  const on = input.pressed ? " is-on" : "";
+  const aria = score
+    ? `${input.label}, score ${score.value}, ${verdict}, ${input.findings} findings`
+    : input.label;
+  return `<button type="button" class="batch-unit${verdictClass}${on}" data-filter="${escapeHtml(input.id)}" aria-pressed="${input.pressed ? "true" : "false"}" aria-label="${escapeHtml(aria)}"><span class="batch-label">${escapeHtml(input.label)}</span>${scoreLine}${findingLine}</button>`;
+}
+
+function alertsMarkup(findings: RankedFinding[]): string {
+  if (findings.length === 0)
+    return '<p class="quiet">No cusp alerts on this map.</p>';
+  return `<ol class="alerts">${findings
+    .map(
+      (finding) =>
+        `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em>${finding.agentScore == null ? "" : ` <span class="agent-score">agent ${finding.agentScore}</span>`} ${escapeHtml(finding.description)}<button type="button" class="alert-path" data-alert-path="${escapeHtml(finding.path)}" data-alert-line="${finding.line ?? ""}" aria-label="Open ${escapeHtml(finding.path)} in the lens">${escapeHtml(finding.path)}${finding.line == null ? "" : `:${finding.line}`}</button></li>`,
+    )
+    .join("")}</ol>`;
 }
 
 function symbolButton(

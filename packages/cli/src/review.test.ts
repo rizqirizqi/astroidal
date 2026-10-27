@@ -18,6 +18,7 @@ import { countChangedSpan, parseUnifiedDiff } from "./diff.js";
 import { readEvidence, writeEvidence } from "./evidence.js";
 import { writePackets } from "./packets.js";
 import { githubSlug, gitlabSlug } from "./forge.js";
+import { renderConstellation } from "./html.js";
 import { assignUnitScores, rankFindings, renderReview } from "./rank.js";
 import { languageFor, parseSyntax } from "./syntax.js";
 import type { Graph } from "./types.js";
@@ -325,8 +326,27 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
   });
   assert.equal(wide.verdict, "review");
   assert.ok(wide.value < 80);
-  assert.match(wide.reason, /a person still reviews the detail/);
+  assert.match(wide.reason, /deepen the hunt|raise confidence/);
   assert.ok(wide.value < edited.value - 15);
+  const wideCleared = scoreReview({
+    impact: {
+      ...calm,
+      securityExposure: 70,
+      complexityDelta: 80,
+      blastRadius: 40,
+    },
+    findings: [],
+    reviewed: true,
+    partial: true,
+    additions: 400,
+    deletions: 80,
+    files: 12,
+    symbols: 20,
+    agentScore: 90,
+  });
+  assert.equal(wideCleared.verdict, "passed");
+  assert.ok(wideCleared.value < 80);
+  assert.match(wideCleared.reason, /high confidence/);
   const unreviewed = scoreReview({
     impact: calm,
     findings: [],
@@ -1641,6 +1661,64 @@ test("each pull request keeps its own verdict", () => {
   assert.match(review, /PR 12: \d+ · Fix first/);
   assert.match(review, /PR 18: \d+ · Passed/);
   assert.doesNotMatch(review, /returned/i);
+  graph.findings = [
+    {
+      id: "A-001",
+      pr: "PR 12",
+      severity: "critical",
+      agentScore: 100,
+      description: "The query concatenates the password.",
+      path: "src/a.ts",
+      line: 1,
+      recommendation: "Bind it.",
+      category: "security",
+      quote: "select password",
+    },
+  ];
+  const html = renderConstellation({
+    ...graph,
+    version: 1,
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    repoName: "demo",
+    notes: [],
+    commands: [],
+    summary: {
+      files: 2,
+      symbols: 0,
+      neighbors: 0,
+      additions: 4,
+      deletions: 0,
+      riskTier: "lite",
+      truncated: false,
+      reviewed: true,
+    },
+    edges: [],
+    leads: [],
+  });
+  assert.match(
+    html,
+    /data-filter="all"[^>]*>[\s\S]*?batch-score">\d+ · Fix first/,
+  );
+  assert.match(html, /class="batch-unit verdict-fix"/);
+  assert.match(html, /class="batch-unit verdict-passed"/);
+  assert.match(html, /batch-score">\d+ · Fix first/);
+  assert.match(html, /batch-score">\d+ · Passed/);
+  assert.doesNotMatch(html, /batch-cusps/);
+  assert.match(html, /batch-findings">1 finding</);
+  assert.match(html, /batch-findings">0 findings</);
+  assert.match(html, /id="review-panel"/);
+  assert.match(html, /id="impact-panel"/);
+  assert.match(html, /id="alerts-panel"/);
+  assert.match(html, /role="tablist"/);
+  assert.match(html, /data-panel="score"/);
+  assert.match(html, /data-panel="findings"/);
+  assert.match(html, /data-panel="lens"/);
+  assert.match(html, /data-panel="symbols"/);
+  assert.match(html, /applyUnitPanel/);
+  assert.match(html, /revealLensDetail/);
+  assert.match(html, /seedMinorStars/);
+  assert.match(html, /aria-label="Score"/);
+  assert.match(html, /aria-label="Findings"/);
 });
 
 test("the review log matches a later cusp on the same path and symbol", () => {

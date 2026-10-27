@@ -194,9 +194,15 @@ export function scoreReview(input: {
     reason =
       "No cusp alerts. The hunt did not mark every added block, so a person still reviews the detail.";
   } else if (value < PASS_LINE) {
-    verdict = "review";
-    reason =
-      "No cusp alerts. The impact is high, so a person still reviews the detail.";
+    if (agentScore != null && agentScore >= PASS_LINE) {
+      verdict = "passed";
+      reason =
+        "No important findings. Impact stays high, but every added block was checked with high confidence.";
+    } else {
+      verdict = "review";
+      reason =
+        "No cusp alerts. The impact is high, so deepen the hunt or raise confidence before this passes.";
+    }
   } else {
     verdict = "passed";
     reason =

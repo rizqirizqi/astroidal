@@ -12,6 +12,8 @@ description: >-
 
 Astroidal is the AI code review map, scorer, and helper. It draws the blast radius and scores what you can prove. Map the change, search it for real bugs, then rank the findings. The chart and the table live in files. The chat reply is a short prose summary a person can paste.
 
+Run every review in five phases, in order: **Recon → Review → Re-review → Verification → Report**. Do not skip ahead to Report after the first `rank`. `Review` from rank is a cue to go deeper in Re-review, not a pasteable end state. The final paste line should be `Passed` or `Fix first`.
+
 The bug catalog is [references/review-lenses.md](references/review-lenses.md), next to this file. Read it before judging a finding. It is not in `.astroidal/`. That file is the only required reference under `references/`.
 
 ## Companion skills
@@ -34,14 +36,16 @@ Delegate with the platform Task / sub-agent tool when any of these hold:
 - The map covers **two or more pull requests** (batch, `--open`, or `--stack` with multiple PRs)
 - **~15 or more** non-test source files in Added lines, or the added lines span several unrelated areas
 - A security companion is in play **and** the security surface is large enough that one pass would skip files
+- Re-review or Verification needs a second pair of eyes on blast radius, architecture, or finding checks (optional even on a small map)
 
 How to split:
 
 - One sub-agent per pull request in a multi-PR map, or per coherent area (auth, API, UI) when a single PR is large
+- In Re-review, one sub-agent may own blast-radius / callers, another architecture / contracts, another bug hunting — or keep it on one agent when the map is small
 - Give each sub-agent the bug-map paths it owns, the matching packet leads, the catalog gate, and any companion skill it should use
 - Sub-agents return candidate findings only (severity, description, path, line, quote, recommendation, category, `pr` when known). They do not write `.astroidal/findings.json`, do not run `rank`, and do not comment on the PR
 
-The parent merges candidates, drops duplicates and anything that fails the gate, writes one `.astroidal/findings.json`, runs `rank` once, and owns the chat reply. A batch is still one merged map and one report — sub-agents parallelize the search, they do not produce separate reviews.
+The parent merges candidates, drops duplicates and anything that fails the gate, writes one `.astroidal/findings.json`, runs `rank`, and owns the chat reply. A batch is still one merged map and one report — sub-agents parallelize the search, they do not produce separate reviews.
 
 Do not add Astroidal as a dependency. Do not edit `package.json`, lockfiles, `pyproject.toml`, `go.mod`, or `Cargo.toml` to install it.
 
@@ -82,7 +86,13 @@ npx --yes astroidal init --global
 
 A global install updates when a newer Astroidal runs `graph` or `rank`, as long as those skill files are still the ones Astroidal wrote. An edited skill stays in place until `init --force`. Run `init` again to refresh a project install.
 
-## Choose the scope
+---
+
+## Phase 1 — Recon
+
+Set up the repo if needed, choose the scope, build the map once, and gather only the forge context the packets still miss.
+
+### Choose the scope
 
 Run `graph` once (after repo setup above). Read the scope note it prints. If that scope is wrong, rerun once with the flag below. Do not rerun after that.
 
@@ -101,17 +111,21 @@ Run `graph` once (after repo setup above). Read the scope note it prints. If tha
 
 A batch is one merged map. Do not review the pull requests as separate reports. When the batch is large enough, use sub-agents for the search as above, then merge into one findings file.
 
-## GitHub
+### GitHub
 
 Call `gh` for what this review still needs. The map already did the local-first reads, so do not list the same files again, refetch a diff it already stored, or poll checks. A few targeted calls are fine, such as `gh pr view` when a title, base, or body is missing. Do not spam `gh`, and do not comment on a pull request, approve it, or request reviewers. Do not run `astroidal comment`. That command writes one comment with the score, the verdict, and the cusp paths. A person or a workflow runs it.
 
-## GitLab
+### GitLab
 
 Call `glab` for what this review still needs. The map already did the local-first reads, so do not list the same files again, refetch a diff it already stored, or poll pipelines. A few targeted calls are fine, such as `glab mr view` when a title, base, or body is missing. Do not spam `glab`, and do not comment on a merge request, approve it, or request reviewers. Do not run `astroidal comment`.
 
-## Search for bugs
+---
 
-Read, in order:
+## Phase 2 — Review
+
+Read the map, hunt for bugs, write findings, and run the first `rank`.
+
+### Read, in order
 
 1. `.astroidal/packets/bug-map.md`
 2. `.astroidal/packets/architecture.md`
@@ -145,7 +159,7 @@ Search all of these classes:
 
 Look for important issues. Leads in the packets are hints, not findings. A code smell, a long file, a missing test, or a dependency bump is a finding only when the catalog's gate passes. Ignore formatting, naming, comments, praise, questions, and refactors that do not name a concrete failure.
 
-## Write findings
+### Write findings
 
 Write `.astroidal/findings.json`:
 
@@ -191,7 +205,7 @@ When changed files belong together for a reason the directory does not already s
 
 Use a short name and at least two mapped paths. Omit `groups` when nothing extra belongs together.
 
-Then run:
+Then run the first rank:
 
 ```bash
 npx --yes astroidal rank
@@ -199,8 +213,65 @@ npx --yes astroidal rank
 
 Rank appends one row to `.astroidal/log.jsonl`: the head, the verdict, the score, and each cusp's path, symbol, and quote. Leave that log in place.
 
-If rank drops a finding because the quote or path is wrong, fix that finding once and rank again. Do not invent a replacement bug to keep the count up. Do not rank a third time.
+Read the verdict line rank prints. **`Review` is not done** — continue to Phase 3. `Fix first` and a clear small `Passed` still continue to Re-review (lighter) and Verification before Report.
 
-## Reply
+---
 
-Write a short prose summary in chat. Open with a line the person can paste: `Astroidal {score} · Passed`, `Astroidal {score} · Review`, or `Astroidal {score} · Fix first`. Passed means a person can skip the detail. Review means a person still reads the change. Then name the highest-severity issues and the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart. The human still decides whether to merge.
+## Phase 3 — Re-review
+
+Go deeper than the first pass. This phase exists so a soft `Review` becomes either real findings (`Fix first`) or a covered, high-confidence clear (`Passed`).
+
+**Always run Re-review when the first rank says `Review`.** Also run it when impact, blast radius, architecture, or security packets look hot even if the first verdict was `Passed` or `Fix first` — deepen the hunt or stress-test the cusps. On a tiny calm `Passed` with full `checked`, a short confirmation pass is enough.
+
+Focus on:
+
+1. **Blast radius** — walk one-hop and two-hop callers/callees the map lists for every changed symbol that can break a contract, authz path, write path, or shared type. Open neighbor files when the packet excerpt is thin.
+2. **Architecture** — cross-module contracts, layering, shared state, schema/API drift, feature groups that span directories. Re-read `architecture.md` and any groups you named.
+3. **Bug hunting** — a second catalog pass on every non-test Added-lines block, including classes you under-weighted the first time. Prefer concrete failures over impact scores.
+
+A sub-agent is optional here. Use one when the map is large, multi-PR, or the first pass left `Review` because coverage or confidence was thin.
+
+Update `.astroidal/findings.json`:
+
+- Add any new gate-passing findings with exact quotes
+- Drop candidates that fail the gate on a second look
+- Complete `checked` for every non-test source file in Added lines
+- Set top-level `agentScore` honestly after the deeper pass (high only when you would pass the change; low when impact or doubt remains and you found no cusp yet)
+
+Then rank again:
+
+```bash
+npx --yes astroidal rank
+```
+
+If this second rank is still `Review`, do not stop: finish any missing `checked` paths, raise or lower `agentScore` to match the deeper pass, and keep hunting until you either file a real finding or can clear with high confidence. Rank allows a covered, high-confidence clear to become `Passed` even when impact is high. Do not invent a bug to escape `Review`. Do not rank more than once more after Verification fixes quote/path drops.
+
+---
+
+## Phase 4 — Verification
+
+Prove the findings (or the clear) before the reply. A sub-agent is optional.
+
+For each finding still in `.astroidal/findings.json`:
+
+- Confirm the quote exists at the path (added-lines block, mapped file, or one-hop neighbor)
+- Confirm the gate, severity, and recommendation still hold
+- Confirm `pr` when the map is a batch
+
+For a clear (`findings: []`):
+
+- Confirm `checked` lists every required non-test Added-lines file
+- Confirm top-level `agentScore` matches how sure you are after Re-review
+
+If rank dropped a finding because the quote or path is wrong, fix that finding once and rank again. Do not invent a replacement bug to keep the count up. After that fix-up rank, do not rank again.
+
+---
+
+## Phase 5 — Report
+
+Write a short prose summary in chat. Open with a line the person can paste: `Astroidal {score} · Passed` or `Astroidal {score} · Fix first`.
+
+- **Passed** — no important findings after Review + Re-review + Verification; a person can skip the detail.
+- **Fix first** — cusp alerts remain; name the highest-severity issues.
+
+Do not paste `Review` as the final line. If rank somehow still says `Review` after Re-review and Verification, keep hunting or adjust `checked` / `agentScore` and rank once more until the verdict is `Passed` or `Fix first`. Then name the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart. The human still decides whether to merge.
