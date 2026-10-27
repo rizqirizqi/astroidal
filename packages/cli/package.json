@@ -27,6 +27,15 @@
   ],
   "license": "MIT",
   "author": "Mgs. M. Rizqi Fadhlurrahman <rizqirizqi23@gmail.com>",
+  "homepage": "https://astroidal.webstor.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rizqirizqi/astroidal.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/rizqirizqi/astroidal/issues"
+  },
   "scripts": {
     "build": "tsc && cp src/sky-script.js dist/sky-script.js",
     "test": "npm run build && node --test dist/*.test.js",
