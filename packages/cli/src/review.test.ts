@@ -526,6 +526,7 @@ test("rank keeps a quoted bug and drops a nit", () => {
     ],
     units: [{ id: "worktree", label: "worktree", source: "local" }],
     findings: [],
+    nodes: [],
   } as unknown as Graph;
   const corpus = new Map([
     [
@@ -560,9 +561,134 @@ test("rank keeps a quoted bug and drops a nit", () => {
   assert.equal(ranked.findings.length, 1);
   assert.equal(ranked.findings[0]?.id, "A-001");
   assert.equal(ranked.findings[0]?.severity, "high");
+  assert.equal(ranked.findings[0]?.locations.length, 1);
   assert.equal(ranked.dropped.length, 1);
   assert.deepEqual(ranked.groups, []);
   assert.equal(ranked.covered, true);
+});
+
+test("rank keeps one finding across multiple files and symbols", () => {
+  const graph = {
+    version: 1,
+    files: [
+      { path: "src/auth.ts", units: ["worktree"], prs: ["worktree"] },
+      { path: "src/session.ts", units: ["worktree"], prs: ["worktree"] },
+    ],
+    neighbors: [],
+    units: [{ id: "worktree", label: "worktree", source: "local" }],
+    findings: [],
+    nodes: [
+      {
+        id: "login",
+        name: "login",
+        kind: "function",
+        path: "src/auth.ts",
+        line: 1,
+        endLine: 3,
+        role: "changed",
+      },
+      {
+        id: "resume",
+        name: "resume",
+        kind: "function",
+        path: "src/session.ts",
+        line: 1,
+        endLine: 3,
+        role: "changed",
+      },
+    ],
+  } as unknown as Graph;
+  const corpus = new Map([
+    [
+      "src/auth.ts",
+      'export function login(password) {\n  return db.query("SELECT " + password)\n}\n',
+    ],
+    [
+      "src/session.ts",
+      "export function resume(user) {\n  return trust(user.id)\n}\n",
+    ],
+  ]);
+  const ranked = rankFindings(
+    graph,
+    {
+      findings: [
+        {
+          severity: "critical",
+          description:
+            "Auth trusts a forged session after a concatenated login query.",
+          path: "src/auth.ts",
+          quote: 'return db.query("SELECT " + password)',
+          recommendation: "Bind the password and verify the session subject.",
+          category: "security",
+          locations: [
+            {
+              path: "src/auth.ts",
+              quote: 'return db.query("SELECT " + password)',
+              symbol: "login",
+            },
+            {
+              path: "src/session.ts",
+              quote: "return trust(user.id)",
+              symbol: "resume",
+            },
+          ],
+        },
+      ],
+      checked: ["src/auth.ts", "src/session.ts"],
+    },
+    (path) => corpus.get(path) ?? null,
+  );
+  assert.equal(ranked.findings.length, 1);
+  assert.equal(ranked.findings[0]?.locations.length, 2);
+  assert.equal(ranked.findings[0]?.locations[0]?.symbol, "login");
+  assert.equal(ranked.findings[0]?.locations[1]?.path, "src/session.ts");
+  assert.equal(ranked.dropped.length, 0);
+  const html = renderConstellation({
+    ...(graph as Graph),
+    version: 1,
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    repoName: "demo",
+    notes: [],
+    commands: [],
+    impact: {
+      blastRadius: 10,
+      complexityDelta: 4,
+      securityExposure: 40,
+      performanceImpact: 0,
+      blastFiles: 1,
+      complexityRaw: 4,
+      securityLeads: 1,
+      performanceLeads: 0,
+      byUnit: [],
+    },
+    summary: {
+      files: 2,
+      symbols: 2,
+      neighbors: 0,
+      additions: 4,
+      deletions: 0,
+      riskTier: "full",
+      truncated: false,
+      reviewed: true,
+    },
+    score: {
+      value: 20,
+      verdict: "fix",
+      reason: "Fix the cusp alerts before this passes.",
+      evidence: 20,
+      agentScore: null,
+    },
+    findings: ranked.findings,
+    groups: [],
+    edges: [],
+    leads: [],
+  });
+  assert.match(html, /Orange marks a finding|orange shape marks a finding/i);
+  assert.match(html, /shape finding/);
+  assert.match(html, /src\/session\.ts/);
+  assert.match(html, /membersForFinding/);
+  assert.match(html, /#FFB020/);
+  assert.doesNotMatch(html, /traceStar/);
 });
 
 test("rank withholds Passed until every added source block is checked", () => {
@@ -1643,6 +1769,14 @@ test("each pull request keeps its own verdict", () => {
         recommendation: "Bind it.",
         category: "security",
         quote: "select password",
+        locations: [
+          {
+            path: "src/a.ts",
+            line: 1,
+            quote: "select password",
+            symbol: null,
+          },
+        ],
       },
     ],
     [],
@@ -1673,6 +1807,14 @@ test("each pull request keeps its own verdict", () => {
       recommendation: "Bind it.",
       category: "security",
       quote: "select password",
+      locations: [
+        {
+          path: "src/a.ts",
+          line: 1,
+          quote: "select password",
+          symbol: null,
+        },
+      ],
     },
   ];
   const html = renderConstellation({

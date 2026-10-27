@@ -67,8 +67,25 @@ export function commentBody(graph: Graph): string {
       : [
           "Cusps:",
           ...findings.map((finding) => {
-            const line = finding.line == null ? "" : `:${finding.line}`;
-            return `- \`${finding.path}${line}\` ${finding.id}`;
+            const locations =
+              finding.locations?.length > 0
+                ? finding.locations
+                : [
+                    {
+                      path: finding.path,
+                      line: finding.line,
+                      quote: finding.quote,
+                      symbol: null,
+                    },
+                  ];
+            const where = locations
+              .map((location) => {
+                const line = location.line == null ? "" : `:${location.line}`;
+                const symbol = location.symbol ? ` (${location.symbol})` : "";
+                return `\`${location.path}${line}\`${symbol}`;
+              })
+              .join(", ");
+            return `- ${where} ${finding.id}`;
           }),
         ].join("\n");
   const units = (graph.units ?? []).flatMap((unit) => {

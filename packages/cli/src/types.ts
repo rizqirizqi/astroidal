@@ -153,6 +153,13 @@ export interface ReviewGroup {
   paths: string[];
 }
 
+export interface FindingLocation {
+  path: string;
+  line: number | null;
+  quote: string;
+  symbol: string | null;
+}
+
 export interface RankedFinding {
   id: string;
   pr: string;
@@ -164,6 +171,7 @@ export interface RankedFinding {
   recommendation: string;
   category: string;
   quote: string;
+  locations: FindingLocation[];
 }
 
 export interface Graph {

@@ -166,7 +166,7 @@ Write `.astroidal/findings.json`:
 ```json
 {
   "agentScore": 88,
-  "checked": ["src/auth.ts"],
+  "checked": ["src/auth.ts", "src/session.ts"],
   "findings": [
     {
       "pr": 12,
@@ -174,16 +174,29 @@ Write `.astroidal/findings.json`:
       "agentScore": 90,
       "description": "What breaks, in one or two sentences.",
       "path": "src/auth.ts",
-      "line": 12,
       "quote": "the exact line copied from the file",
       "recommendation": "The specific change that removes the bug.",
-      "category": "security"
+      "category": "security",
+      "locations": [
+        {
+          "path": "src/auth.ts",
+          "quote": "the exact line copied from the file",
+          "symbol": "login"
+        },
+        {
+          "path": "src/session.ts",
+          "quote": "return trust(user.id)",
+          "symbol": "resume"
+        }
+      ]
     }
   ]
 }
 ```
 
 `severity` is `critical`, `high`, or `medium`, using the gate in the catalog. `critical` is a crash, data loss, authz bypass, injection, or secret exposure on a path users hit. `high` is a realistic wrong result, lost write, race, or broken contract. `medium` is a realistic edge that fails. `quote` is one exact line copied from an added-lines block, the mapped file, or its one-hop neighbor. Set `pr` to the pull request that introduced that line, or omit it for a local change.
+
+One finding can cover several files or symbols. Prefer `locations` when the bug spans more than one place: each entry needs a mapped `path`, and at least one entry needs a verifiable `quote`. Optional `symbol` names the mapped symbol. You can also pass related `paths` or `symbols` beside a primary `path` + `quote`. The constellation keeps each symbol's shape and paints the finding's member stars orange.
 
 `agentScore` on a finding is 0 to 100: how sure you are that the quoted line breaks. `agentScore` beside the findings is 0 to 100 and points the other way: 100 means you would pass the change. `checked` lists every non-test source file in Added lines that you read. Rank withholds Passed until that list is complete. Omit a finding's `agentScore` only when you are fully sure; rank then treats it as 100.
 

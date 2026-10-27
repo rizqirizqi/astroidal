@@ -40,15 +40,14 @@
   var byId = {};
   nodes.forEach(function (node) {
     byId[node.id] = node;
-    findings.forEach(function (finding) {
-      if (finding.path === node.path) node.findings.push(finding);
+  });
+  findings.forEach(function (finding) {
+    membersForFinding(finding).forEach(function (node) {
+      if (node.findings.indexOf(finding) === -1) node.findings.push(finding);
     });
-    if (
-      node.findings.some(function (finding) {
-        return finding.severity === "critical" || finding.severity === "high";
-      })
-    )
-      node.r = 7.5;
+  });
+  nodes.forEach(function (node) {
+    if (node.findings.length) node.r = 7.5;
   });
 
   var camera = { x: 0, y: 0, scale: 1 };
@@ -374,19 +373,60 @@
     camera.y = -((box.minY + box.maxY) / 2);
   }
 
+  function findingLocations(finding) {
+    if (finding.locations && finding.locations.length) return finding.locations;
+    return [
+      {
+        path: finding.path,
+        line: finding.line,
+        quote: finding.quote || "",
+        symbol: finding.symbol || null,
+      },
+    ];
+  }
+
+  function membersForFinding(finding) {
+    var members = [];
+    findingLocations(finding).forEach(function (location) {
+      var matches = nodes.filter(function (node) {
+        return location.path === node.path;
+      });
+      var changed = matches.filter(function (node) {
+        return node.role === "changed";
+      });
+      var pool = changed.length ? changed : matches;
+      if (!pool.length) return;
+      var pick = pool[0];
+      if (location.symbol) {
+        var named = pool.find(function (node) {
+          return node.name === location.symbol;
+        });
+        if (named) pick = named;
+      } else if (typeof location.line === "number") {
+        var covering = pool.filter(function (node) {
+          return (
+            node.kind !== "file" &&
+            location.line >= node.line &&
+            location.line <= node.endLine
+          );
+        });
+        pick = (covering.length ? covering : pool).reduce(
+          function (best, node) {
+            return Math.abs(node.line - location.line) <
+              Math.abs(best.line - location.line)
+              ? node
+              : best;
+          },
+          covering.length ? covering[0] : pool[0],
+        );
+      }
+      if (pick && members.indexOf(pick) === -1) members.push(pick);
+    });
+    return members;
+  }
+
   function colorFor(node) {
-    if (
-      node.findings.some(function (finding) {
-        return finding.severity === "critical";
-      })
-    )
-      return "#FFB020";
-    if (
-      node.findings.some(function (finding) {
-        return finding.severity === "high";
-      })
-    )
-      return "#D2B4FF";
+    if (node.findings.length) return "#FFB020";
     if (node.spectral === "contract") return "#D2B4FF";
     if (node.spectral === "logic") return "#00F2FE";
     if (node.role === "neighbor") return "#7E8BA3";
@@ -421,11 +461,7 @@
 
   function traceShape(node, x, y, radius) {
     context.beginPath();
-    if (
-      node.spectral === "contract" &&
-      node.role === "changed" &&
-      node.findings.length === 0
-    ) {
+    if (node.spectral === "contract" && node.role === "changed") {
       context.moveTo(x, y - radius);
       context.lineTo(x + radius, y);
       context.lineTo(x, y + radius);
@@ -433,11 +469,7 @@
       context.closePath();
       return;
     }
-    if (
-      node.spectral === "text" &&
-      node.role === "changed" &&
-      node.findings.length === 0
-    ) {
+    if (node.spectral === "text" && node.role === "changed") {
       var side = radius * 1.7;
       context.rect(x - side / 2, y - side / 2, side, side);
       return;
@@ -819,7 +851,11 @@
     if (left > width - 280) left = Math.max(8, x - 280);
     tip.style.left = left + "px";
     tip.style.top = Math.max(8, y + 14) + "px";
-    tip.textContent = node.name + " · " + node.path + ":" + node.line;
+    var cusp =
+      node.findings.length > 0
+        ? " · " + node.findings[0].id + " " + node.findings[0].severity
+        : "";
+    tip.textContent = node.name + " · " + node.path + ":" + node.line + cusp;
   }
 
   function openPanel(name) {
@@ -1427,10 +1463,33 @@
               : ' <span class="agent-score">agent ' +
                 finding.agentScore +
                 "</span>";
-          var line =
-            finding.line == null || finding.line === ""
-              ? ""
-              : ":" + finding.line;
+          var locations = findingLocations(finding);
+          var buttons = locations
+            .map(function (location) {
+              var line =
+                location.line == null || location.line === ""
+                  ? ""
+                  : ":" + location.line;
+              var symbol = location.symbol
+                ? " (" + escapeHtml(location.symbol) + ")"
+                : "";
+              return (
+                '<button type="button" class="alert-path" data-alert-path="' +
+                escapeHtml(location.path) +
+                '" data-alert-line="' +
+                (location.line == null ? "" : location.line) +
+                '" data-alert-id="' +
+                escapeHtml(finding.id) +
+                '" aria-label="Open ' +
+                escapeHtml(location.path) +
+                ' in the lens">' +
+                escapeHtml(location.path) +
+                line +
+                symbol +
+                "</button>"
+              );
+            })
+            .join("");
           return (
             '<li class="sev-' +
             escapeHtml(finding.severity) +
@@ -1442,16 +1501,8 @@
             agent +
             " " +
             escapeHtml(finding.description) +
-            '<button type="button" class="alert-path" data-alert-path="' +
-            escapeHtml(finding.path) +
-            '" data-alert-line="' +
-            (finding.line == null ? "" : finding.line) +
-            '" aria-label="Open ' +
-            escapeHtml(finding.path) +
-            ' in the lens">' +
-            escapeHtml(finding.path) +
-            line +
-            "</button></li>"
+            buttons +
+            "</li>"
           );
         })
         .join("") +

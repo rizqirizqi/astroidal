@@ -158,7 +158,7 @@ export function renderConstellation(graph: Graph): string {
     .c-s { grid-column: 2; grid-row: 3; text-align: center; }
     .c-w { grid-column: 1; grid-row: 2; align-self: center; }
     .lens-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line); }
-    .hint { margin: 0; max-width: 28ch; color: var(--muted); font-size: 11px; letter-spacing: 0.04em; line-height: 1.45; text-align: right; }
+    .hint { margin: 0; max-width: 56ch; color: var(--muted); font-size: 11px; letter-spacing: 0.04em; line-height: 1.45; text-align: right; }
     .lens-controls { display: flex; gap: 8px; }
     .lens-controls button { border-radius: 10px; min-height: 36px; }
     aside { overflow: hidden; border-left: 1px solid var(--line); padding: 0; background: var(--panel); display: flex; min-height: 0; }
@@ -226,6 +226,7 @@ export function renderConstellation(graph: Graph): string {
     .shape.contract { color: var(--violet-ink); transform: rotate(45deg); }
     .shape.text { color: #C5D0E2; border-radius: 2px; }
     .shape.orbit { color: #7E8BA3; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+    .shape.finding { color: var(--amber); border-radius: 50%; }
     .unit-fold { margin: 0 0 18px; }
     summary { display: inline-flex; border-radius: 10px; }
     .units { margin-top: 10px; display: grid; gap: 8px; }
@@ -328,7 +329,7 @@ export function renderConstellation(graph: Graph): string {
   </div>
   <main>
     <section class="sky" tabindex="0" aria-label="Change map. Arrow keys move the map. Plus and minus lens in and out.">
-      <p class="sr">${graph.summary.symbols} changed symbols and ${graph.summary.neighbors} neighbors. A cyan cloud is one directory. A violet dashed cloud is a group named in the review. A line is an import or a call. Logic is a circle, contract is a diamond, text is a square, and orbit neighbors are rings.</p>
+      <p class="sr">${graph.summary.symbols} changed symbols and ${graph.summary.neighbors} neighbors. A cyan cloud is one directory. A violet dashed cloud is a group named in the review. A line is an import or a call. Logic is a circle, contract is a diamond, text is a square, and orbit neighbors are rings. An orange shape marks a finding on that symbol; one finding can cover several files or symbols.</p>
       <canvas id="sky"></canvas>
       <div id="tip" hidden></div>
       <div class="lens-bar">
@@ -337,7 +338,7 @@ export function renderConstellation(graph: Graph): string {
           <button type="button" id="lens-out">Lens out</button>
           <button type="button" id="lens-fit">Fit</button>
         </div>
-        <p class="hint">A cloud is a directory. Violet is a named group. A line is an import or a call.</p>
+        <p class="hint">A cloud is a directory. Violet is a named group. A line is an import or a call. Orange marks a finding.</p>
       </div>
     </section>
     <aside aria-label="Review panels">
@@ -352,6 +353,7 @@ export function renderConstellation(graph: Graph): string {
               <li><i class="shape contract" aria-hidden="true"></i> Contract <b>${countSpectral(graph.nodes, "contract")}</b></li>
               <li><i class="shape text" aria-hidden="true"></i> Text <b>${countSpectral(graph.nodes, "text")}</b></li>
               <li><i class="shape orbit" aria-hidden="true"></i> Orbit</li>
+              <li><i class="shape finding" aria-hidden="true"></i> Finding <b>${graph.findings.length}</b></li>
             </ul>
             ${unitScores}
           </section>
@@ -453,10 +455,29 @@ function alertsMarkup(findings: RankedFinding[]): string {
   if (findings.length === 0)
     return '<p class="quiet">No cusp alerts on this map.</p>';
   return `<ol class="alerts">${findings
-    .map(
-      (finding) =>
-        `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em>${finding.agentScore == null ? "" : ` <span class="agent-score">agent ${finding.agentScore}</span>`} ${escapeHtml(finding.description)}<button type="button" class="alert-path" data-alert-path="${escapeHtml(finding.path)}" data-alert-line="${finding.line ?? ""}" aria-label="Open ${escapeHtml(finding.path)} in the lens">${escapeHtml(finding.path)}${finding.line == null ? "" : `:${finding.line}`}</button></li>`,
-    )
+    .map((finding) => {
+      const locations =
+        finding.locations?.length > 0
+          ? finding.locations
+          : [
+              {
+                path: finding.path,
+                line: finding.line,
+                quote: finding.quote,
+                symbol: null as string | null,
+              },
+            ];
+      const buttons = locations
+        .map((location) => {
+          const line = location.line == null ? "" : `:${location.line}`;
+          const symbol = location.symbol
+            ? ` (${escapeHtml(location.symbol)})`
+            : "";
+          return `<button type="button" class="alert-path" data-alert-path="${escapeHtml(location.path)}" data-alert-line="${location.line ?? ""}" data-alert-id="${escapeHtml(finding.id)}" aria-label="Open ${escapeHtml(location.path)} in the lens">${escapeHtml(location.path)}${line}${symbol}</button>`;
+        })
+        .join("");
+      return `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em>${finding.agentScore == null ? "" : ` <span class="agent-score">agent ${finding.agentScore}</span>`} ${escapeHtml(finding.description)}${buttons}</li>`;
+    })
     .join("")}</ol>`;
 }
 

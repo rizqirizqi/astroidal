@@ -2,6 +2,7 @@ import { scoreReview, verdictLabel } from "./analyze.js";
 import { isSourcePath } from "./syntax.js";
 import type {
   DroppedFinding,
+  FindingLocation,
   Graph,
   GraphUnit,
   RankedFinding,
@@ -40,6 +41,14 @@ const ALIASES: Record<string, Severity | "drop"> = {
   minor: "drop",
 };
 
+interface RawLocation {
+  path?: string;
+  file?: string;
+  line?: number;
+  quote?: string;
+  symbol?: string;
+}
+
 interface RawFinding {
   pr?: number | string;
   severity?: string;
@@ -52,6 +61,9 @@ interface RawFinding {
   recommendation?: string;
   category?: string;
   agentScore?: number;
+  locations?: RawLocation[];
+  paths?: string[];
+  symbols?: string[];
 }
 
 export interface RankResult {
@@ -85,30 +97,31 @@ export function rankFindings(
 
   for (const item of raw) {
     const description = (item.description ?? item.issue ?? "").trim();
-    const path = normalizePath(item.path ?? item.file ?? "");
     const recommendation = (item.recommendation ?? "").trim();
-    const quote = (item.quote ?? "").trim();
+    const drafts = collectLocationDrafts(item, graph);
+    const primaryPath =
+      drafts[0]?.path ?? normalizePath(item.path ?? item.file ?? "");
     if (!description) {
       dropped.push({
         description: description || "(blank)",
-        path,
+        path: primaryPath,
         reason: "missing description",
       });
       continue;
     }
     if (!recommendation) {
-      dropped.push({ description, path, reason: "missing recommendation" });
-      continue;
-    }
-    if (!path) {
-      dropped.push({ description, path, reason: "missing path" });
-      continue;
-    }
-    if (!changed.has(path) && !neighbors.has(path)) {
       dropped.push({
         description,
-        path,
-        reason: "path is outside the mapped change and its one-hop neighbors",
+        path: primaryPath,
+        reason: "missing recommendation",
+      });
+      continue;
+    }
+    if (drafts.length === 0) {
+      dropped.push({
+        description,
+        path: primaryPath,
+        reason: "missing path",
       });
       continue;
     }
@@ -116,46 +129,68 @@ export function rankFindings(
     if (severity === "drop" || !severity) {
       dropped.push({
         description,
-        path,
+        path: primaryPath,
         reason:
           "severity is a nit, suggestion, or unspecified low-priority note",
       });
       continue;
     }
-    if (quote.length < 6) {
+    const locations: FindingLocation[] = [];
+    let failed: DroppedFinding | null = null;
+    for (const draft of drafts) {
+      const resolved = resolveLocation(
+        draft,
+        description,
+        changed,
+        neighbors,
+        graph,
+        readCorpus,
+      );
+      if ("reason" in resolved) {
+        failed = resolved;
+        break;
+      }
+      if (
+        !locations.some(
+          (item) =>
+            item.path === resolved.path &&
+            item.line === resolved.line &&
+            item.symbol === resolved.symbol &&
+            item.quote === resolved.quote,
+        )
+      )
+        locations.push(resolved);
+    }
+    if (failed) {
+      dropped.push(failed);
+      continue;
+    }
+    const evidence = locations.find((item) => item.quote.length >= 6);
+    if (!evidence) {
       dropped.push({
         description,
-        path,
+        path: primaryPath,
         reason:
           "quote must be an exact line from the file, at least 6 characters",
       });
       continue;
     }
-    const corpus = readCorpus(path);
-    if (corpus == null) {
-      dropped.push({ description, path, reason: "file could not be read" });
-      continue;
-    }
-    const found = locateQuote(corpus, quote);
-    if (found == null) {
-      dropped.push({
-        description,
-        path,
-        reason: "quote was not found in that file",
-      });
-      continue;
-    }
+    const ordered = [
+      evidence,
+      ...locations.filter((item) => item !== evidence),
+    ];
     accepted.push({
       id: "",
-      pr: prLabel(item.pr, path, graph),
+      pr: prLabel(item.pr, evidence.path, graph),
       severity,
       agentScore: clampScore(item.agentScore),
       description,
-      path,
-      line: found,
+      path: evidence.path,
+      line: evidence.line,
       recommendation,
       category: (item.category ?? "correctness").trim() || "correctness",
-      quote,
+      quote: evidence.quote,
+      locations: ordered,
     });
   }
 
@@ -175,6 +210,15 @@ export function rankFindings(
       previous.line = finding.line;
       previous.agentScore = finding.agentScore;
       previous.quote = finding.quote;
+      previous.locations = mergeLocations(
+        previous.locations,
+        finding.locations,
+      );
+    } else {
+      previous.locations = mergeLocations(
+        previous.locations,
+        finding.locations,
+      );
     }
     dropped.push({
       description: finding.description,
@@ -331,13 +375,202 @@ function findingInUnit(
   const named =
     labels.includes(unit.label) ||
     (unit.pr != null && labels.includes(`PR ${unit.pr}`));
-  const file = graph.files.find((item) => item.path === finding.path);
-  if (file) return file.units.includes(unit.id) && named;
-  const neighbor = graph.neighbors.find((item) => item.path === finding.path);
+  if (!named) return false;
+  const locations =
+    finding.locations?.length > 0
+      ? finding.locations
+      : [
+          {
+            path: finding.path,
+            line: finding.line,
+            quote: finding.quote,
+            symbol: null,
+          },
+        ];
+  return locations.some((location) => pathInUnit(location.path, unit, graph));
+}
+
+function pathInUnit(path: string, unit: GraphUnit, graph: Graph): boolean {
+  const file = graph.files.find((item) => item.path === path);
+  if (file) return file.units.includes(unit.id);
+  const neighbor = graph.neighbors.find((item) => item.path === path);
   if (!neighbor) return false;
   const via = graph.files.find((item) => item.path === neighbor.via);
   if (!via) return graph.units.length === 1;
-  return via.units.includes(unit.id) && named;
+  return via.units.includes(unit.id);
+}
+
+interface LocationDraft {
+  path: string;
+  quote: string;
+  symbol: string | null;
+}
+
+function collectLocationDrafts(
+  item: RawFinding,
+  graph: Graph,
+): LocationDraft[] {
+  const drafts: LocationDraft[] = [];
+  const push = (path: string, quote: string, symbol: string | null) => {
+    const normalized = normalizePath(path);
+    if (!normalized && !symbol) return;
+    if (
+      drafts.some(
+        (draft) =>
+          draft.path === normalized &&
+          draft.quote === quote &&
+          draft.symbol === symbol,
+      )
+    )
+      return;
+    drafts.push({ path: normalized, quote, symbol });
+  };
+
+  const topPath = normalizePath(item.path ?? item.file ?? "");
+  const topQuote = (item.quote ?? "").trim();
+  const hasLocations =
+    Array.isArray(item.locations) && item.locations.length > 0;
+
+  if (hasLocations) {
+    for (const location of item.locations!) {
+      if (!location || typeof location !== "object") continue;
+      push(
+        location.path ?? location.file ?? topPath,
+        (location.quote ?? "").trim() || topQuote,
+        typeof location.symbol === "string" && location.symbol.trim()
+          ? location.symbol.trim()
+          : null,
+      );
+    }
+  } else if (topPath || topQuote) {
+    push(topPath, topQuote, null);
+  }
+
+  if (Array.isArray(item.paths)) {
+    for (const path of item.paths) {
+      if (typeof path !== "string") continue;
+      push(path, "", null);
+    }
+  }
+
+  if (Array.isArray(item.symbols)) {
+    for (const symbol of item.symbols) {
+      if (typeof symbol !== "string" || !symbol.trim()) continue;
+      const name = symbol.trim();
+      const matches = graph.nodes.filter(
+        (node) => node.name === name && node.kind !== "file",
+      );
+      if (matches.length === 1) {
+        const node = matches[0]!;
+        push(node.path, "", name);
+        continue;
+      }
+      if (topPath) {
+        const onPath = matches.filter((node) => node.path === topPath);
+        if (onPath.length === 1) {
+          push(topPath, "", name);
+          continue;
+        }
+      }
+      push(topPath, "", name);
+    }
+  }
+
+  return drafts;
+}
+
+function resolveLocation(
+  draft: LocationDraft,
+  description: string,
+  changed: Set<string>,
+  neighbors: Set<string>,
+  graph: Graph,
+  readCorpus: (path: string) => string | null,
+): FindingLocation | DroppedFinding {
+  let path = draft.path;
+  let symbol = draft.symbol;
+  if (!path && symbol) {
+    const matches = graph.nodes.filter(
+      (node) => node.name === symbol && node.kind !== "file",
+    );
+    if (matches.length === 1) path = matches[0]!.path;
+  }
+  if (!path) {
+    return {
+      description,
+      path: symbol ?? "",
+      reason: symbol
+        ? `symbol ${symbol} could not be resolved to one mapped path`
+        : "missing path",
+    };
+  }
+  if (!changed.has(path) && !neighbors.has(path)) {
+    return {
+      description,
+      path,
+      reason: "path is outside the mapped change and its one-hop neighbors",
+    };
+  }
+  const quote = draft.quote;
+  if (quote.length >= 6) {
+    const corpus = readCorpus(path);
+    if (corpus == null) {
+      return { description, path, reason: "file could not be read" };
+    }
+    const found = locateQuote(corpus, quote);
+    if (found == null) {
+      return {
+        description,
+        path,
+        reason: "quote was not found in that file",
+      };
+    }
+    if (!symbol) symbol = symbolAt(graph, path, found) || null;
+    return { path, line: found, quote, symbol };
+  }
+  if (symbol) {
+    const node = graph.nodes.find(
+      (item) =>
+        item.path === path && item.name === symbol && item.kind !== "file",
+    );
+    return {
+      path,
+      line: node?.line ?? null,
+      quote: "",
+      symbol,
+    };
+  }
+  return { path, line: null, quote: "", symbol: null };
+}
+
+function mergeLocations(
+  left: FindingLocation[],
+  right: FindingLocation[],
+): FindingLocation[] {
+  const merged = [...left];
+  for (const location of right) {
+    if (
+      merged.some(
+        (item) =>
+          item.path === location.path &&
+          item.line === location.line &&
+          item.symbol === location.symbol &&
+          item.quote === location.quote,
+      )
+    )
+      continue;
+    merged.push(location);
+  }
+  return merged;
+}
+
+function symbolAt(graph: Graph, path: string, line: number | null): string {
+  if (line == null) return "";
+  const nodes = graph.nodes.filter(
+    (node) => node.path === path && node.kind !== "file",
+  );
+  const hit = nodes.find((node) => line >= node.line && line <= node.endLine);
+  return hit?.name ?? "";
 }
 
 function readGroups(input: unknown, graph: Graph): ReviewGroup[] {
@@ -473,7 +706,28 @@ function prLabel(
 }
 
 function formatPath(finding: RankedFinding): string {
-  return finding.line ? `${finding.path}:${finding.line}` : finding.path;
+  const locations =
+    finding.locations?.length > 0
+      ? finding.locations
+      : [
+          {
+            path: finding.path,
+            line: finding.line,
+            quote: finding.quote,
+            symbol: null,
+          },
+        ];
+  const parts = locations.map((location) => {
+    const at =
+      location.line == null
+        ? location.path
+        : `${location.path}:${location.line}`;
+    return location.symbol ? `${at} (${location.symbol})` : at;
+  });
+  return (
+    parts.join(", ") ||
+    (finding.line ? `${finding.path}:${finding.line}` : finding.path)
+  );
 }
 
 function cell(value: string): string {

@@ -26,11 +26,24 @@ interface LogRow {
 export function appendReviewLog(root: string, graph: Graph): void {
   const path = join(root, ".astroidal", "log.jsonl");
   const prior = readLog(path);
-  const cusps = (graph.findings ?? []).map((finding) => ({
-    path: finding.path,
-    symbol: symbolAt(graph, finding.path, finding.line),
-    quote: finding.quote,
-  }));
+  const cusps = (graph.findings ?? []).flatMap((finding) => {
+    const locations =
+      finding.locations?.length > 0
+        ? finding.locations
+        : [
+            {
+              path: finding.path,
+              line: finding.line,
+              quote: finding.quote,
+              symbol: null as string | null,
+            },
+          ];
+    return locations.map((location) => ({
+      path: location.path,
+      symbol: location.symbol || symbolAt(graph, location.path, location.line),
+      quote: location.quote || finding.quote,
+    }));
+  });
   const matched: LogMatch[] = [];
   for (const cusp of cusps) {
     if (!cusp.symbol) continue;
