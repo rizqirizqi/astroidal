@@ -284,6 +284,12 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
     securityLeads: 0,
     performanceLeads: 0,
   };
+  const clear = {
+    blast: 100,
+    complexity: 100,
+    security: 100,
+    performance: 100,
+  };
   const typo = scoreReview({
     impact: calm,
     findings: [],
@@ -293,6 +299,7 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
     deletions: 0,
     files: 1,
     symbols: 0,
+    agentScores: clear,
   });
   assert.equal(typo.verdict, "passed");
   assert.equal(typo.value, 100);
@@ -305,6 +312,7 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
     deletions: 6,
     files: 1,
     symbols: 1,
+    agentScores: clear,
   });
   assert.equal(edited.verdict, "passed");
   assert.ok(edited.value >= 90 && edited.value <= 98);
@@ -326,7 +334,7 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
   });
   assert.equal(wide.verdict, "review");
   assert.ok(wide.value < 80);
-  assert.match(wide.reason, /deepen the hunt|raise confidence/);
+  assert.match(wide.reason, /Set blast, complexity, security, and performance/);
   assert.ok(wide.value < edited.value - 15);
   const wideCleared = scoreReview({
     impact: {
@@ -347,6 +355,24 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
   assert.equal(wideCleared.verdict, "passed");
   assert.ok(wideCleared.value < 80);
   assert.match(wideCleared.reason, /high confidence/);
+  const lowAxis = scoreReview({
+    impact: calm,
+    findings: [],
+    reviewed: true,
+    partial: false,
+    additions: 1,
+    deletions: 0,
+    files: 1,
+    symbols: 0,
+    agentScores: {
+      blast: 90,
+      complexity: 90,
+      security: 50,
+      performance: 90,
+    },
+  });
+  assert.equal(lowAxis.verdict, "review");
+  assert.match(lowAxis.reason, /Lowest agent confidence is 50/);
   const unreviewed = scoreReview({
     impact: calm,
     findings: [],
@@ -368,6 +394,7 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
     deletions: 0,
     files: 1,
     symbols: 0,
+    agentScores: clear,
   });
   assert.equal(broken.verdict, "fix");
   assert.ok(broken.value < 80);
@@ -380,6 +407,7 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
     deletions: 0,
     files: 1,
     symbols: 0,
+    agentScores: clear,
   });
   const certain = scoreReview({
     impact: calm,
@@ -390,6 +418,7 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
     deletions: 0,
     files: 1,
     symbols: 0,
+    agentScores: clear,
   });
   assert.equal(unsure.verdict, "fix");
   assert.equal(certain.verdict, "fix");
@@ -405,9 +434,10 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
     symbols: 0,
     agentScore: 0,
   });
-  assert.equal(worried.evidence, 99);
-  assert.equal(worried.value, 79);
+  assert.ok(worried.value < 80);
+  assert.equal(worried.value, worried.evidence);
   assert.equal(worried.verdict, "review");
+  assert.equal(worried.breakdown.security.agentRisk, 100);
   const uncovered = scoreReview({
     impact: calm,
     findings: [],
@@ -417,6 +447,7 @@ test("the review score reaches 100 for a one-line change and falls off as the ch
     deletions: 0,
     files: 1,
     symbols: 0,
+    agentScores: clear,
     covered: false,
   });
   assert.equal(uncovered.verdict, "review");
@@ -676,7 +707,19 @@ test("rank keeps one finding across multiple files and symbols", () => {
       verdict: "fix",
       reason: "Fix the cusp alerts before this passes.",
       evidence: 20,
-      agentScore: null,
+      agentScores: null,
+      impact: {
+        blastRadius: 10,
+        complexityDelta: 4,
+        securityExposure: 40,
+        performanceImpact: 0,
+      },
+      breakdown: {
+        blast: { map: 10, agent: null, agentRisk: null, merged: 10 },
+        complexity: { map: 4, agent: null, agentRisk: null, merged: 4 },
+        security: { map: 40, agent: null, agentRisk: null, merged: 40 },
+        performance: { map: 0, agent: null, agentRisk: null, merged: 0 },
+      },
     },
     findings: ranked.findings,
     groups: [],
@@ -689,6 +732,10 @@ test("rank keeps one finding across multiple files and symbols", () => {
   assert.match(html, /membersForFinding/);
   assert.match(html, /#FFB020/);
   assert.doesNotMatch(html, /traceStar/);
+  assert.match(html, /alerts-table/);
+  assert.match(html, /Recommendation/);
+  assert.match(html, /Bind the password and verify the session subject/);
+  assert.doesNotMatch(html, /agent-score|agent 90/);
 });
 
 test("rank withholds Passed until every added source block is checked", () => {
@@ -706,11 +753,30 @@ test("rank withholds Passed until every added source block is checked", () => {
   assert.deepEqual(open.missing, ["src/auth.ts"]);
   const closed = rankFindings(
     graph,
-    { findings: [], checked: ["src/auth.ts"], agentScore: 91 },
+    {
+      findings: [],
+      checked: ["src/auth.ts"],
+      agentScores: {
+        blast: 91,
+        complexity: 91,
+        security: 91,
+        performance: 91,
+      },
+      summary: {
+        headline: "Touches auth.",
+        bullets: ["Reads src/auth.ts"],
+      },
+    },
     () => null,
   );
   assert.equal(closed.covered, true);
-  assert.equal(closed.agentScore, 91);
+  assert.deepEqual(closed.agentScores, {
+    blast: 91,
+    complexity: 91,
+    security: 91,
+    performance: 91,
+  });
+  assert.equal(closed.summary?.headline, "Touches auth.");
 });
 
 test("rank keeps a logical group and drops a path outside the map", () => {
@@ -830,7 +896,7 @@ test("graph and rank review a worktree without adding a dependency", () => {
     const review = readFileSync(join(root, ".astroidal", "review.md"), "utf8");
     assert.match(
       review,
-      /\| ID \| Severity \| Agent \| Issue Description \| File Path \| Recommendation \| PR \|/,
+      /\| ID \| Severity \| Issue \| Recommendation \| Path \| PR \|/,
     );
     assert.match(review, /A-001/);
     assert.match(review, /src\/auth\.ts/);
@@ -846,6 +912,8 @@ test("graph and rank review a worktree without adding a dependency", () => {
     assert.match(html, /Fix first/);
     assert.match(review, /AI code review map for this change/);
     assert.match(html, /Impact surface/);
+    assert.match(html, /alerts-table/);
+    assert.match(html, /Bind the password instead of concatenating it/);
     assert.match(html, /A-001/);
     assert.match(html, /id="view-tree" class="is-on"/);
     assert.match(html, /id="symbol-list" hidden/);
@@ -1670,6 +1738,12 @@ test("the score reason compares blast with recent merges", () => {
     securityLeads: 0,
     performanceLeads: 0,
   };
+  const clear = {
+    blast: 100,
+    complexity: 100,
+    security: 100,
+    performance: 100,
+  };
   const plain = scoreReview({
     impact: { ...calm, blastRadius: 40 },
     findings: [],
@@ -1679,6 +1753,7 @@ test("the score reason compares blast with recent merges", () => {
     deletions: 0,
     files: 1,
     symbols: 0,
+    agentScores: clear,
   });
   const compared = scoreReview({
     impact: { ...calm, blastRadius: 40 },
@@ -1689,6 +1764,7 @@ test("the score reason compares blast with recent merges", () => {
     deletions: 0,
     files: 1,
     symbols: 0,
+    agentScores: clear,
     baseline: { blast: 40, median: 12, branch: "main" },
   });
   assert.equal(compared.verdict, plain.verdict);
@@ -1706,6 +1782,7 @@ test("the score reason compares blast with recent merges", () => {
     deletions: 0,
     files: 1,
     symbols: 0,
+    agentScores: clear,
     baseline: { blast: 12, median: 12, branch: "refs/heads/main" },
   });
   assert.match(
@@ -1760,11 +1837,29 @@ test("each pull request keeps its own verdict", () => {
       verdict: "fix",
       reason: "Fix the cusp alerts before this passes.",
       evidence: 31,
-      agentScore: null,
+      agentScores: null,
+      impact: {
+        blastRadius: 0,
+        complexityDelta: 0,
+        securityExposure: 0,
+        performanceImpact: 0,
+      },
+      breakdown: {
+        blast: { map: 0, agent: null, agentRisk: null, merged: 0 },
+        complexity: { map: 0, agent: null, agentRisk: null, merged: 0 },
+        security: { map: 0, agent: null, agentRisk: null, merged: 0 },
+        performance: { map: 0, agent: null, agentRisk: null, merged: 0 },
+      },
     },
     findings: [],
     groups: [],
   } as unknown as Graph;
+  const clearScores = {
+    blast: 100,
+    complexity: 100,
+    security: 100,
+    performance: 100,
+  };
   assignUnitScores(
     graph,
     [
@@ -1790,20 +1885,39 @@ test("each pull request keeps its own verdict", () => {
       },
     ],
     [],
-    null,
+    clearScores,
+    {
+      "12": {
+        headline: "Auth query change.",
+        bullets: ["Touches login"],
+      },
+      "18": {
+        headline: "Neighbor cleanup.",
+        bullets: ["Touches helpers"],
+      },
+    },
   );
   assert.equal(graph.units[0]?.score?.verdict, "fix");
   assert.equal(graph.units[1]?.score?.verdict, "passed");
+  assert.equal(graph.units[0]?.changeSummary?.headline, "Auth query change.");
+  graph.changeSummary = {
+    headline: "Batch touches auth and helpers.",
+    bullets: ["PR 12 auth", "PR 18 helpers"],
+  };
   const review = renderReview(graph, {
     findings: graph.findings,
     dropped: [],
     groups: [],
-    agentScore: null,
+    agentScores: clearScores,
+    summary: graph.changeSummary,
+    unitSummaries: {},
     covered: true,
     missing: [],
   });
   assert.match(review, /PR 12: \d+ · Fix first/);
   assert.match(review, /PR 18: \d+ · Passed/);
+  assert.match(review, /Batch touches auth and helpers/);
+  assert.match(review, /Auth query change/);
   assert.doesNotMatch(review, /returned/i);
   graph.findings = [
     {
@@ -1859,6 +1973,9 @@ test("each pull request keeps its own verdict", () => {
   assert.match(html, /batch-findings">1 finding</);
   assert.match(html, /batch-findings">0 findings</);
   assert.match(html, /id="review-panel"/);
+  assert.match(html, /id="summary-panel"/);
+  assert.match(html, /Batch touches auth and helpers/);
+  assert.match(html, /impact-breakdown/);
   assert.match(html, /id="impact-panel"/);
   assert.match(html, /id="alerts-panel"/);
   assert.match(html, /role="tablist"/);
