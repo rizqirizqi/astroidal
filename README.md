@@ -1,6 +1,19 @@
-# Astroidal ✦
+<div align="center">
 
-AI code review map, scorer, and helper. Astroidal draws the change. Your agent looks for bugs. Astroidal scores what survives: **Passed**, **Review**, or **Fix first**.
+<img src="docs/assets/logo.svg" alt="Astroidal" width="96" height="96" />
+
+# Astroidal
+
+**Give your agent a map. Find what actually breaks.**
+
+AI code review map, scorer, and helper. Astroidal draws the blast radius, steers your agent to real bugs, and scores the review into a clear verdict: **Passed**, **Review**, or **Fix first**.
+
+[![npm](https://img.shields.io/npm/v/astroidal)](https://www.npmjs.com/package/astroidal)
+[![CI](https://img.shields.io/github/actions/workflow/status/rizqirizqi/astroidal/ci.yml?branch=main)](https://github.com/rizqirizqi/astroidal/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/astroidal)](LICENSE)
+[![node](https://img.shields.io/node/v/astroidal)](https://nodejs.org)
+
+</div>
 
 ## How a review goes
 
@@ -31,31 +44,19 @@ npx --yes astroidal rank
 Reply with the score, Passed, Review, or Fix first, and the paths to .astroidal/review.md and .astroidal/constellation.html.
 ```
 
-`init` installs the skill into `.agents/skills/astroidal/` and ignores `.astroidal/`. Codex reads that directory. Pass `--agent cursor`, `--agent claude`, or `--agent copilot` to copy the same skill into that agent's directory (`.cursor/skills`, `.claude/skills`, or `.github/skills`). `--agent all` installs each of them. `init --global` installs for every repository; a global Copilot copy is `~/.copilot/skills/astroidal/`. `init --force` replaces a skill you edited. A newer Astroidal refreshes an unmodified global skill on `graph` or `rank`.
+`init` installs the skill (default `.agents/skills/astroidal/`) and ignores `.astroidal/`. Pass `--agent cursor`, `--agent claude`, `--agent copilot`, or `--agent all` for other agent directories. `rank` exits 1 on Fix first; Passed and Review exit 0.
 
-`rank` exits 1 on Fix first. Passed and Review exit 0. A missing map or findings file still errors.
-
-`rank` appends one row to `.astroidal/log.jsonl`: the head, the verdict, the score, and each cusp's path, symbol, and quote. A later row records a cusp that matches an earlier one on the same path and symbol. `.astroidal/` stays gitignored, so the log belongs to this clone.
-
-The score reason compares blast radius with the median blast of recent merge commits on the default branch.
-
-`comment` writes one comment on the pull request: the score, the verdict, and the cusp paths. It updates that same comment when it runs again. It does not approve, merge, or request reviewers. Pass `--pr` when the map has no pull request, or when it covers more than one. A batch lists one verdict for each pull request. The merged map stays one score.
+Command flags, exit codes, hosts (`gh` / `glab`), and the full output layout are in the [CLI README](packages/cli/README.md).
 
 ## Output
 
-| File                            | What it is                      |
-| ------------------------------- | ------------------------------- |
-| `.astroidal/constellation.html` | The map and the score           |
-| `.astroidal/packets/bug-map.md` | What the agent searches         |
-| `.astroidal/review.md`          | Ranked findings, after `rank`   |
-| `.astroidal/log.jsonl`          | Head, verdict, score, and cusps |
-| `.astroidal/graph.json`         | The same map for tools          |
-
-Rank keeps critical, high, and medium findings that quote a real line in the change or a direct neighbor. Those findings show on the map.
+| File                            | What it is                    |
+| ------------------------------- | ----------------------------- |
+| `.astroidal/constellation.html` | The map and the score         |
+| `.astroidal/packets/bug-map.md` | What the agent searches       |
+| `.astroidal/review.md`          | Ranked findings, after `rank` |
 
 ## Scope
-
-A dirty worktree maps uncommitted changes, including untracked files. A clean branch maps that branch against its default base. A batch stays one map, and each pull request also gets Passed, Review, or Fix first.
 
 ```bash
 npx --yes astroidal graph --pr 12,18,24
@@ -64,8 +65,6 @@ npx --yes astroidal graph --stack
 npx --yes astroidal graph --commit HEAD
 npx --yes astroidal graph --staged
 ```
-
-Local branches are read with git. `gh` lists open GitHub pull requests and fetches a diff whose branch is not local. `glab` does the same for GitLab merge requests. The host comes from the origin remote, or from the glab config for a self-hosted GitLab. `astroidal --help` covers the rest, including `--author`, `--base`, `--unstaged`, and `--repo`.
 
 ## Repository
 

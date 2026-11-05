@@ -21,7 +21,7 @@ import { assignUnitScores, rankFindings, renderReview } from "./rank.js";
 import type { Graph, GraphOptions } from "./types.js";
 
 const HELP = `Astroidal is the AI code review map, scorer, and helper.
-It draws the blast radius, hands an agent a bug map, and scores what survives.
+It draws the blast radius, hands an agent a bug map, and scores the review into a clear verdict.
 It does not add itself as a dependency.
 
   npx --yes astroidal init
