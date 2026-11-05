@@ -18,6 +18,7 @@ import {
   type Language,
 } from "./syntax.js";
 import type {
+  AgentScores,
   BuildResult,
   BuiltFile,
   BuiltSymbol,
@@ -27,8 +28,10 @@ import type {
   GraphEdge,
   GraphNeighbor,
   GraphNode,
+  ImpactBreakdown,
   ImpactScores,
   Lead,
+  MergedImpact,
   ParsedFile,
   ReviewScore,
   RiskTier,
@@ -131,6 +134,13 @@ const SEVERITY_DRAG: Record<Severity, number> = {
   medium: 0.24,
 };
 
+const AXIS_WEIGHTS = {
+  blast: { map: 0.75, agent: 0.25 },
+  complexity: { map: 0.75, agent: 0.25 },
+  security: { map: 0.55, agent: 0.45 },
+  performance: { map: 0.7, agent: 0.3 },
+} as const;
+
 export function verdictLabel(verdict: Verdict): string {
   if (verdict === "passed") return "Passed";
   if (verdict === "review") return "Review";
@@ -142,6 +152,108 @@ export function clampAgentScore(value: unknown): number | null {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+export function expandAgentScores(
+  value: number | null | undefined,
+): AgentScores | null {
+  const score = clampAgentScore(value);
+  if (score == null) return null;
+  return {
+    blast: score,
+    complexity: score,
+    security: score,
+    performance: score,
+  };
+}
+
+export function normalizeAgentScores(input: unknown): AgentScores | null {
+  if (typeof input !== "object" || input === null) return null;
+  const record = input as Record<string, unknown>;
+  const blast = clampAgentScore(record.blast);
+  const complexity = clampAgentScore(record.complexity);
+  const security = clampAgentScore(record.security);
+  const performance = clampAgentScore(record.performance);
+  if (
+    blast == null ||
+    complexity == null ||
+    security == null ||
+    performance == null
+  )
+    return null;
+  return { blast, complexity, security, performance };
+}
+
+export function mergeImpactAxis(
+  mapScore: number,
+  agentConfidence: number | null,
+  weights: { map: number; agent: number },
+): {
+  map: number;
+  agent: number | null;
+  agentRisk: number | null;
+  merged: number;
+} {
+  const map = clampScoreValue(mapScore);
+  if (agentConfidence == null) {
+    return { map, agent: null, agentRisk: null, merged: map };
+  }
+  const agent = clampScoreValue(agentConfidence);
+  const agentRisk = 100 - agent;
+  const merged = clampScoreValue(weights.map * map + weights.agent * agentRisk);
+  return { map, agent, agentRisk, merged };
+}
+
+export function mergeImpactScores(
+  impact: Pick<
+    ImpactScores,
+    "blastRadius" | "complexityDelta" | "securityExposure" | "performanceImpact"
+  >,
+  agentScores: AgentScores | null,
+): { impact: MergedImpact; breakdown: ImpactBreakdown } {
+  const blast = mergeImpactAxis(
+    impact.blastRadius,
+    agentScores?.blast ?? null,
+    AXIS_WEIGHTS.blast,
+  );
+  const complexity = mergeImpactAxis(
+    impact.complexityDelta,
+    agentScores?.complexity ?? null,
+    AXIS_WEIGHTS.complexity,
+  );
+  const security = mergeImpactAxis(
+    impact.securityExposure,
+    agentScores?.security ?? null,
+    AXIS_WEIGHTS.security,
+  );
+  const performance = mergeImpactAxis(
+    impact.performanceImpact,
+    agentScores?.performance ?? null,
+    AXIS_WEIGHTS.performance,
+  );
+  return {
+    impact: {
+      blastRadius: blast.merged,
+      complexityDelta: complexity.merged,
+      securityExposure: security.merged,
+      performanceImpact: performance.merged,
+    },
+    breakdown: { blast, complexity, security, performance },
+  };
+}
+
+function clampScoreValue(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function minAgentConfidence(scores: AgentScores | null): number | null {
+  if (!scores) return null;
+  return Math.min(
+    scores.blast,
+    scores.complexity,
+    scores.security,
+    scores.performance,
+  );
+}
+
 export function scoreReview(input: {
   impact: ImpactScores;
   findings: Array<{ severity: Severity; agentScore?: number | null }>;
@@ -151,10 +263,14 @@ export function scoreReview(input: {
   deletions: number;
   files: number;
   symbols: number;
+  agentScores?: AgentScores | null;
   agentScore?: number | null;
   covered?: boolean;
   baseline?: { blast: number; median: number; branch: string } | null;
 }): ReviewScore {
+  const agentScores =
+    input.agentScores ?? expandAgentScores(input.agentScore) ?? null;
+  const merged = mergeImpactScores(input.impact, agentScores);
   const lines = Math.max(0, input.additions + input.deletions);
   const findingDrag = input.findings.reduce((sum, finding) => {
     const confidence = (finding.agentScore ?? 100) / 100;
@@ -164,10 +280,10 @@ export function scoreReview(input: {
     Math.sqrt(lines) * 0.003 +
     Math.sqrt(Math.max(input.files - 1, 0)) * 0.035 +
     Math.sqrt(Math.max(input.symbols, 0)) * 0.008 +
-    (input.impact.blastRadius / 100) * 0.28 +
-    (input.impact.complexityDelta / 100) * 0.28 +
-    (input.impact.securityExposure / 100) * 0.62 +
-    (input.impact.performanceImpact / 100) * 0.22 +
+    (merged.impact.blastRadius / 100) * 0.28 +
+    (merged.impact.complexityDelta / 100) * 0.28 +
+    (merged.impact.securityExposure / 100) * 0.62 +
+    (merged.impact.performanceImpact / 100) * 0.22 +
     findingDrag +
     (input.partial ? 0.05 : 0) +
     (input.reviewed ? 0 : 0.42);
@@ -175,16 +291,10 @@ export function scoreReview(input: {
     0,
     Math.min(100, Math.round(100 * Math.exp(-drag))),
   );
-  const agentScore = clampAgentScore(input.agentScore);
-  const value =
-    agentScore == null
-      ? evidence
-      : Math.max(
-          0,
-          Math.min(100, Math.round(0.8 * evidence + 0.2 * agentScore)),
-        );
+  const value = evidence;
   const clean = input.findings.length === 0;
   const covered = input.covered !== false;
+  const confidence = minAgentConfidence(agentScores);
   let verdict: Verdict = "fix";
   let reason = "Fix the cusp alerts before this passes.";
   if (!input.reviewed) reason = "Rank the findings before this can pass.";
@@ -193,24 +303,28 @@ export function scoreReview(input: {
     verdict = "review";
     reason =
       "No cusp alerts. The hunt did not mark every added block, so a person still reviews the detail.";
-  } else if (value < PASS_LINE) {
-    if (agentScore != null && agentScore >= PASS_LINE) {
-      verdict = "passed";
-      reason =
-        "No important findings. Impact stays high, but every added block was checked with high confidence.";
-    } else {
-      verdict = "review";
-      reason =
-        "No cusp alerts. The impact is high, so deepen the hunt or raise confidence before this passes.";
-    }
+  } else if (confidence == null || confidence < PASS_LINE) {
+    verdict = "review";
+    reason =
+      confidence == null
+        ? "No cusp alerts. Set blast, complexity, security, and performance agent scores so the verdict can clear."
+        : `No cusp alerts. Lowest agent confidence is ${confidence} on an impact surface, so a person still reviews the detail.`;
   } else {
     verdict = "passed";
     reason =
-      "No important findings, and the impact stays under the pass line. The detail does not need another review.";
+      "No important findings. Every added block was checked with high confidence across the impact surfaces.";
   }
   if (input.baseline)
     reason = `${reason} ${blastComparison(input.baseline.blast, input.baseline.median, input.baseline.branch)}`;
-  return { value, verdict, reason, evidence, agentScore };
+  return {
+    value,
+    verdict,
+    reason,
+    evidence,
+    agentScores,
+    impact: merged.impact,
+    breakdown: merged.breakdown,
+  };
 }
 
 function blastComparison(

@@ -1,6 +1,13 @@
-import { scoreReview, verdictLabel } from "./analyze.js";
+import {
+  expandAgentScores,
+  normalizeAgentScores,
+  scoreReview,
+  verdictLabel,
+} from "./analyze.js";
 import { isSourcePath } from "./syntax.js";
 import type {
+  AgentScores,
+  ChangeSummary,
   DroppedFinding,
   FindingLocation,
   Graph,
@@ -70,7 +77,9 @@ export interface RankResult {
   findings: RankedFinding[];
   dropped: DroppedFinding[];
   groups: ReviewGroup[];
-  agentScore: number | null;
+  agentScores: AgentScores | null;
+  summary: ChangeSummary | null;
+  unitSummaries: Record<string, ChangeSummary>;
   covered: boolean;
   missing: string[];
 }
@@ -243,7 +252,9 @@ export function rankFindings(
     findings: deduped,
     dropped,
     groups: readGroups(input, graph),
-    agentScore: readAgentScore(input),
+    agentScores: readAgentScores(input),
+    summary: readChangeSummary(input),
+    unitSummaries: readUnitSummaries(input, graph),
     covered: missing.length === 0,
     missing,
   };
@@ -262,12 +273,15 @@ export function renderReview(graph: Graph, result: RankResult): string {
     ...(graph.score
       ? [
           `Score: ${graph.score.value} · ${verdictLabel(graph.score.verdict)}. ${graph.score.reason}`,
-          ...(graph.score.agentScore == null
+          ...(graph.score.agentScores == null
             ? []
-            : [`Agent score: ${graph.score.agentScore}`]),
+            : [
+                `Agent scores: blast ${graph.score.agentScores.blast}, complexity ${graph.score.agentScores.complexity}, security ${graph.score.agentScores.security}, performance ${graph.score.agentScores.performance}`,
+              ]),
           "",
         ]
       : []),
+    ...summaryLines(graph.changeSummary, "Changes"),
     ...unitVerdicts(graph),
     "Chart: `.astroidal/constellation.html`",
     "",
@@ -279,14 +293,14 @@ export function renderReview(graph: Graph, result: RankResult): string {
     );
   }
   lines.push(
-    "| ID | Severity | Agent | Issue Description | File Path | Recommendation | PR |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
+    "| ID | Severity | Issue | Recommendation | Path | PR |",
+    "| --- | --- | --- | --- | --- | --- |",
   );
   if (result.findings.length === 0)
-    lines.push("| | | | No confirmed findings. | | | |");
+    lines.push("| | | No confirmed findings. | | | |");
   for (const finding of result.findings) {
     lines.push(
-      `| ${cell(finding.id)} | ${cell(finding.severity)} | ${cell(finding.agentScore == null ? "" : String(finding.agentScore))} | ${cell(finding.description)} | ${cell(formatPath(finding))} | ${cell(finding.recommendation)} | ${cell(finding.pr)} |`,
+      `| ${cell(finding.id)} | ${cell(finding.severity)} | ${cell(finding.description)} | ${cell(finding.recommendation)} | ${cell(formatPath(finding))} | ${cell(finding.pr)} |`,
     );
   }
   lines.push("");
@@ -305,7 +319,8 @@ export function assignUnitScores(
   graph: Graph,
   findings: RankedFinding[],
   missing: string[],
-  agentScore: number | null,
+  agentScores: AgentScores | null,
+  unitSummaries: Record<string, ChangeSummary> = {},
 ): void {
   const open = new Set(missing);
   const baseline = graph.baseline
@@ -342,7 +357,7 @@ export function assignUnitScores(
       deletions: files.reduce((sum, file) => sum + file.deletions, 0),
       files: files.length,
       symbols,
-      agentScore,
+      agentScores,
       covered: required.every((path) => !open.has(path)),
       baseline: baseline
         ? {
@@ -352,6 +367,12 @@ export function assignUnitScores(
           }
         : null,
     });
+    const summary =
+      unitSummaries[unit.id] ??
+      (unit.pr != null ? unitSummaries[String(unit.pr)] : undefined) ??
+      unitSummaries[unit.label];
+    if (summary) unit.changeSummary = summary;
+    else delete unit.changeSummary;
   }
 }
 
@@ -359,11 +380,24 @@ function unitVerdicts(graph: Graph): string[] {
   if (graph.units.length < 2) return [];
   const lines = graph.units.flatMap((unit) => {
     if (!unit.score) return [];
-    return [
+    const block = [
       `${unit.label}: ${unit.score.value} · ${verdictLabel(unit.score.verdict)}`,
+      ...summaryLines(unit.changeSummary, unit.label),
     ];
+    return block;
   });
   return lines.length === 0 ? [] : [...lines, ""];
+}
+
+function summaryLines(
+  summary: ChangeSummary | null | undefined,
+  title: string,
+): string[] {
+  if (!summary) return [];
+  const lines = [`## ${title}`, "", summary.headline, ""];
+  for (const bullet of summary.bullets) lines.push(`- ${bullet}`);
+  if (summary.bullets.length > 0) lines.push("");
+  return lines;
 }
 
 function findingInUnit(
@@ -610,10 +644,64 @@ function clampScore(value: unknown): number | null {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function readAgentScore(input: unknown): number | null {
-  if (typeof input !== "object" || input === null || !("agentScore" in input))
-    return null;
-  return clampScore(input.agentScore);
+function readAgentScores(input: unknown): AgentScores | null {
+  if (typeof input !== "object" || input === null) return null;
+  const record = input as { agentScores?: unknown; agentScore?: unknown };
+  return (
+    normalizeAgentScores(record.agentScores) ??
+    expandAgentScores(clampScore(record.agentScore))
+  );
+}
+
+function readChangeSummary(input: unknown): ChangeSummary | null {
+  if (typeof input !== "object" || input === null) return null;
+  const record = input as { summary?: unknown };
+  return parseChangeSummary(record.summary);
+}
+
+function readUnitSummaries(
+  input: unknown,
+  graph: Graph,
+): Record<string, ChangeSummary> {
+  if (typeof input !== "object" || input === null) return {};
+  const record = input as { unitSummaries?: unknown };
+  if (
+    typeof record.unitSummaries !== "object" ||
+    record.unitSummaries === null ||
+    Array.isArray(record.unitSummaries)
+  )
+    return {};
+  const raw = record.unitSummaries as Record<string, unknown>;
+  const out: Record<string, ChangeSummary> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    const summary = parseChangeSummary(value);
+    if (!summary) continue;
+    out[key] = summary;
+    const unit = graph.units.find(
+      (item) =>
+        item.id === key ||
+        item.label === key ||
+        (item.pr != null && String(item.pr) === key),
+    );
+    if (unit) out[unit.id] = summary;
+  }
+  return out;
+}
+
+function parseChangeSummary(value: unknown): ChangeSummary | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as { headline?: unknown; bullets?: unknown };
+  const headline =
+    typeof record.headline === "string" ? record.headline.trim() : "";
+  if (!headline) return null;
+  const bullets = Array.isArray(record.bullets)
+    ? record.bullets
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 12)
+    : [];
+  return { headline: headline.slice(0, 280), bullets };
 }
 
 function readChecked(input: unknown): Set<string> {

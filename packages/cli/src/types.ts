@@ -70,6 +70,7 @@ export interface GraphUnit {
   base?: string;
   head?: string;
   score?: ReviewScore;
+  changeSummary?: ChangeSummary;
 }
 
 export type Verdict = "passed" | "review" | "fix";
@@ -80,12 +81,47 @@ export interface BlastBaseline {
   merges: number;
 }
 
+export interface AgentScores {
+  blast: number;
+  complexity: number;
+  security: number;
+  performance: number;
+}
+
+export interface ChangeSummary {
+  headline: string;
+  bullets: string[];
+}
+
+export interface ImpactAxisBreakdown {
+  map: number;
+  agent: number | null;
+  agentRisk: number | null;
+  merged: number;
+}
+
+export interface ImpactBreakdown {
+  blast: ImpactAxisBreakdown;
+  complexity: ImpactAxisBreakdown;
+  security: ImpactAxisBreakdown;
+  performance: ImpactAxisBreakdown;
+}
+
+export interface MergedImpact {
+  blastRadius: number;
+  complexityDelta: number;
+  securityExposure: number;
+  performanceImpact: number;
+}
+
 export interface ReviewScore {
   value: number;
   verdict: Verdict;
   reason: string;
   evidence: number;
-  agentScore: number | null;
+  agentScores: AgentScores | null;
+  impact: MergedImpact;
+  breakdown: ImpactBreakdown;
 }
 
 export interface ImpactScores {
@@ -195,6 +231,7 @@ export interface Graph {
     truncated: boolean;
     reviewed: boolean;
   };
+  changeSummary?: ChangeSummary;
   score: ReviewScore;
   files: GraphFile[];
   neighbors: GraphNeighbor[];

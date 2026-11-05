@@ -150,6 +150,8 @@ export function main(argv: string[]): number {
     graph.findings = ranked.findings;
     graph.groups = ranked.groups;
     graph.summary.reviewed = true;
+    if (ranked.summary) graph.changeSummary = ranked.summary;
+    else delete graph.changeSummary;
     graph.score = scoreReview({
       impact: graph.impact,
       findings: ranked.findings,
@@ -159,7 +161,7 @@ export function main(argv: string[]): number {
       deletions: graph.summary.deletions,
       files: graph.summary.files,
       symbols: graph.summary.symbols,
-      agentScore: ranked.agentScore,
+      agentScores: ranked.agentScores,
       covered: ranked.covered,
       baseline: graph.baseline
         ? {
@@ -169,7 +171,13 @@ export function main(argv: string[]): number {
           }
         : null,
     });
-    assignUnitScores(graph, ranked.findings, ranked.missing, ranked.agentScore);
+    assignUnitScores(
+      graph,
+      ranked.findings,
+      ranked.missing,
+      ranked.agentScores,
+      ranked.unitSummaries,
+    );
     const directory = join(root, ".astroidal");
     writeFileSync(
       join(directory, "graph.json"),
