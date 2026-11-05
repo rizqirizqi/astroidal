@@ -42,7 +42,7 @@ export const WORKFLOW = [
     who: "Astroidal",
     tone: "tool",
     title: "Scores the review",
-    text: "The verdict is Passed, Review, or Fix first. Passed means the detail can be skipped. Review means a person still reads the change. Fix first means a quoted bug remains.",
+    text: "The verdict is Passed, Review, or Fix first. Passed means the detail can be skipped. Review means coverage or agent confidence is still thin. Fix first means a quoted bug remains.",
   },
 ] as const;
 
@@ -69,7 +69,7 @@ export const QUESTIONS = [
   {
     question: "What does Passed, Review, or Fix first mean?",
     answer:
-      "Passed means rank found no cusp, every added block was checked, and the score is at least 80, so a person can skip the detail. Review means there is no cusp and a person still reads the change, because the impact is high or a block was not checked. Fix first means rank kept a finding that quotes a real line.",
+      "Passed means rank found no cusp, every added block was checked, and every impact-surface agent score is at least 80, so a person can skip the detail. Review means there is no cusp, but a block was not checked or the agent is still below 80 on an impact surface. Fix first means rank kept a finding that quotes a real line.",
   },
   {
     question: "What can one map cover?",

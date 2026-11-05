@@ -165,8 +165,23 @@ Write `.astroidal/findings.json`:
 
 ```json
 {
-  "agentScore": 88,
+  "agentScores": {
+    "blast": 88,
+    "complexity": 90,
+    "security": 84,
+    "performance": 95
+  },
   "checked": ["src/auth.ts", "src/session.ts"],
+  "summary": {
+    "headline": "One sentence what this change does.",
+    "bullets": ["Concrete change 1", "Concrete change 2"]
+  },
+  "unitSummaries": {
+    "12": {
+      "headline": "What this pull request changes.",
+      "bullets": ["PR-specific change"]
+    }
+  },
   "findings": [
     {
       "pr": 12,
@@ -198,7 +213,9 @@ Write `.astroidal/findings.json`:
 
 One finding can cover several files or symbols. Prefer `locations` when the bug spans more than one place: each entry needs a mapped `path`, and at least one entry needs a verifiable `quote`. Optional `symbol` names the mapped symbol. You can also pass related `paths` or `symbols` beside a primary `path` + `quote`. The constellation keeps each symbol's shape and paints the finding's member stars orange.
 
-`agentScore` on a finding is 0 to 100: how sure you are that the quoted line breaks. `agentScore` beside the findings is 0 to 100 and points the other way: 100 means you would pass the change. `checked` lists every non-test source file in Added lines that you read. Rank withholds Passed until that list is complete. Omit a finding's `agentScore` only when you are fully sure; rank then treats it as 100.
+`agentScores` rates confidence to pass each impact surface from 0 to 100: blast (caller/neighbor reach), complexity (decision density), security (trust and authz), and performance (hot paths). 100 means you would clear that surface. Rank merges those scores into the impact chart and withholds `Passed` until every axis is at least 80, `checked` is complete, and no cusp remains. Prefer `agentScores` over a single top-level `agentScore`; a lone number still expands to all four axes for older files. `agentScore` on a finding is 0 to 100: how sure you are that the quoted line breaks. Omit a finding's `agentScore` only when you are fully sure; rank then treats it as 100.
+
+`summary` is required for the constellation: one headline sentence plus a short bullet list of what changed. For a batch, also set `unitSummaries` keyed by pull request number or unit label. Local or single-PR maps only need `summary`.
 
 Say what breaks, name the symbol, and give the change that removes the bug. For security and architecture, say why that change holds. Do not hedge, restate the quoted line, or file a question. An empty `findings` array is valid only after the added lines of every non-test source file have been checked against the catalog and none of them contain an important bug.
 
@@ -249,7 +266,8 @@ Update `.astroidal/findings.json`:
 - Add any new gate-passing findings with exact quotes
 - Drop candidates that fail the gate on a second look
 - Complete `checked` for every non-test source file in Added lines
-- Set top-level `agentScore` honestly after the deeper pass (high only when you would pass the change; low when impact or doubt remains and you found no cusp yet)
+- Set `agentScores` honestly after the deeper pass (high on an axis only when you would clear that surface; keep an axis low when doubt remains there and you found no cusp yet)
+- Refresh `summary` / `unitSummaries` so the constellation still describes the change
 
 Then rank again:
 
@@ -257,7 +275,7 @@ Then rank again:
 npx --yes astroidal rank
 ```
 
-If this second rank is still `Review`, do not stop: finish any missing `checked` paths, raise or lower `agentScore` to match the deeper pass, and keep hunting until you either file a real finding or can clear with high confidence. Rank allows a covered, high-confidence clear to become `Passed` even when impact is high. Do not invent a bug to escape `Review`. Do not rank more than once more after Verification fixes quote/path drops.
+If this second rank is still `Review`, do not stop: finish any missing `checked` paths, raise or lower each `agentScores` axis to match the deeper pass, and keep hunting until you either file a real finding or can clear with high confidence on every axis. Rank allows a covered, high-confidence clear to become `Passed` even when map impact is high. Do not invent a bug to escape `Review`. Do not rank more than once more after Verification fixes quote/path drops.
 
 ---
 
@@ -274,7 +292,8 @@ For each finding still in `.astroidal/findings.json`:
 For a clear (`findings: []`):
 
 - Confirm `checked` lists every required non-test Added-lines file
-- Confirm top-level `agentScore` matches how sure you are after Re-review
+- Confirm every `agentScores` axis is at least 80 after Re-review
+- Confirm `summary` (and `unitSummaries` for a batch) still matches the change
 
 If rank dropped a finding because the quote or path is wrong, fix that finding once and rank again. Do not invent a replacement bug to keep the count up. After that fix-up rank, do not rank again.
 
@@ -284,7 +303,8 @@ If rank dropped a finding because the quote or path is wrong, fix that finding o
 
 Write a short prose summary in chat. Open with a line the person can paste: `Astroidal {score} · Passed` or `Astroidal {score} · Fix first`.
 
-- **Passed** — no important findings after Review + Re-review + Verification; a person can skip the detail.
-- **Fix first** — cusp alerts remain; name the highest-severity issues.
+- **Passed** — no important findings after Review + Re-review + Verification; every added block was checked; every impact-surface agent score is at least 80. A person can skip the detail.
+- **Fix first** — cusp alerts remain; name the highest-severity issues and the recommendations.
+- **Review** is only a mid-loop cue: coverage is incomplete or an `agentScores` axis is still below 80. Do not paste it as the final line.
 
-Do not paste `Review` as the final line. If rank somehow still says `Review` after Re-review and Verification, keep hunting or adjust `checked` / `agentScore` and rank once more until the verdict is `Passed` or `Fix first`. Then name the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart. The human still decides whether to merge.
+Do not paste `Review` as the final line. If rank somehow still says `Review` after Re-review and Verification, keep hunting or adjust `checked` / `agentScores` and rank once more until the verdict is `Passed` or `Fix first`. Then name the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart. The human still decides whether to merge.
