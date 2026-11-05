@@ -3,9 +3,12 @@ export const ISSUES_URL = "https://github.com/rizqirizqi/astroidal/issues";
 export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
 export const INSTALL_COMMAND = "npx --yes astroidal";
 
-export const SETUP_PROMPT = `Set up Astroidal and review this change. Do not add it as a dependency. Run:
+export const SETUP_PROMPT = `Set up Astroidal and review. Do not add it as a dependency. Run:
 
 npx --yes astroidal init
+
+If the user has not named a change, commit, or pull request to review, ask what to review before mapping. Then run graph for that scope (for example graph, graph --pr N, graph --commit SHA, graph --staged, or graph --open):
+
 npx --yes astroidal graph
 
 Follow the installed Astroidal skill: search the bug map and write .astroidal/findings.json. Then run:
