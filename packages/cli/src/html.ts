@@ -3,9 +3,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { scoreReview, verdictLabel } from "./analyze.js";
 import type {
+  ChangeSummary,
   Graph,
   GraphNode,
   GraphUnit,
+  ImpactBreakdown,
+  ImpactScores,
+  MergedImpact,
   RankedFinding,
   ReviewScore,
 } from "./types.js";
@@ -13,8 +17,9 @@ import type {
 export function renderConstellation(graph: Graph): string {
   const payload = JSON.stringify(graph).replaceAll("<", "\\u003c");
   const script = loadSky();
-  const impact = graph.impact;
   const review = reviewOf(graph);
+  const impact = review.impact;
+  const complexityRaw = graph.impact.complexityRaw;
   const units = graph.units
     .map((unit) => batchUnitButton(graph, unit))
     .join("");
@@ -209,9 +214,15 @@ export function renderConstellation(graph: Graph): string {
     .verdict-fix .verdict-row b, .verdict-fix .verdict-label { color: var(--amber); }
     .verdict-passed .verdict-row b, .verdict-passed .verdict-label { color: var(--cyan); }
     .verdict-review .verdict-row b, .verdict-review .verdict-label { color: var(--violet-ink); }
-    .agent-score { color: var(--violet-ink); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
     .verdict .quiet { margin: 0; font-size: 13px; }
-    .legend, .units, .alerts { list-style: none; padding: 0; margin: 0 0 16px; }
+    .change-summary { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0 0 18px; background: rgba(255, 255, 255, 0.03); }
+    .change-summary h2 { margin: 0 0 8px; }
+    .change-summary .headline { margin: 0 0 8px; font-size: 14px; line-height: 1.45; }
+    .change-summary ul { margin: 0; padding: 0 0 0 18px; display: grid; gap: 4px; }
+    .change-summary li { color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .legend, .units { list-style: none; padding: 0; margin: 0 0 16px; }
+    .impact-breakdown { margin: 0 0 16px; display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+    .impact-breakdown span { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--ink); }
     .surface { width: 100%; height: auto; display: block; margin: 0 0 4px; }
     .surface .guide { fill: none; stroke: rgba(232, 238, 248, 0.2); stroke-width: 1; }
     .surface .axis { stroke: rgba(232, 238, 248, 0.16); stroke-width: 1; }
@@ -259,12 +270,16 @@ export function renderConstellation(graph: Graph): string {
     .diff-table tr.hunk td { padding: 8px 10px; color: #c5b6e0; background: rgba(127, 0, 255, 0.16); }
     .diff-table tr.is-mark { box-shadow: inset 3px 0 0 var(--cyan); }
     .alert { color: var(--amber); }
-    .alerts { display: grid; gap: 8px; }
-    .alerts li { padding: 10px 10px 10px 12px; border-left: 3px solid var(--cyan); border-radius: 0 10px 10px 0; background: rgba(255, 255, 255, 0.03); }
-    .alerts em { font-style: normal; text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; color: var(--muted); }
-    .sev-critical { border-color: var(--amber); }
-    .sev-high { border-color: var(--violet-ink); }
-    .alerts .alert-path { display: block; width: 100%; margin-top: 6px; padding: 0; border: 0; background: transparent; color: var(--cyan); font: 12px/1.4 "JetBrains Mono", ui-monospace, monospace; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+    .alerts-wrap { margin: 0 0 16px; overflow-x: auto; }
+    .alerts-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .alerts-table th, .alerts-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .alerts-table th { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+    .alerts-table .sev { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .alerts-table tr.sev-critical .sev { color: var(--amber); }
+    .alerts-table tr.sev-high .sev { color: var(--violet-ink); }
+    .alerts-table .issue, .alerts-table .fix { line-height: 1.4; }
+    .alerts-table .paths { display: grid; gap: 4px; }
+    .alerts .alert-path { display: block; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: var(--cyan); font: 12px/1.4 "JetBrains Mono", ui-monospace, monospace; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
     .alerts .alert-path:hover { color: var(--ink); }
     .symbol-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
     .symbol-head h2 { margin: 0; }
@@ -346,8 +361,9 @@ export function renderConstellation(graph: Graph): string {
         <div class="aside-panels">
           <section id="panel-score" class="panel-stack" role="tabpanel" aria-labelledby="tab-score">
             <div id="review-panel">${scoreCard(review)}</div>
+            <div id="summary-panel">${changeSummaryMarkup(graph.changeSummary)}</div>
             <h2>Impact surface</h2>
-            <div id="impact-panel">${impactSurface(impact)}</div>
+            <div id="impact-panel">${impactSurface(impact, complexityRaw, review.breakdown)}</div>
             <ul class="legend">
               <li><i class="shape logic" aria-hidden="true"></i> Logic <b>${countSpectral(graph.nodes, "logic")}</b></li>
               <li><i class="shape contract" aria-hidden="true"></i> Contract <b>${countSpectral(graph.nodes, "contract")}</b></li>
@@ -394,7 +410,7 @@ export function renderConstellation(graph: Graph): string {
 }
 
 function reviewOf(graph: Graph): ReviewScore {
-  if (graph.score) return graph.score;
+  if (graph.score?.impact && graph.score.breakdown) return graph.score;
   return scoreReview({
     impact: graph.impact,
     findings: graph.findings ?? [],
@@ -404,6 +420,7 @@ function reviewOf(graph: Graph): ReviewScore {
     deletions: graph.summary.deletions,
     files: graph.summary.files,
     symbols: graph.summary.symbols,
+    agentScores: graph.score?.agentScores ?? null,
   });
 }
 
@@ -454,7 +471,7 @@ function batchFilterButton(input: {
 function alertsMarkup(findings: RankedFinding[]): string {
   if (findings.length === 0)
     return '<p class="quiet">No cusp alerts on this map.</p>';
-  return `<ol class="alerts">${findings
+  const rows = findings
     .map((finding) => {
       const locations =
         finding.locations?.length > 0
@@ -476,9 +493,10 @@ function alertsMarkup(findings: RankedFinding[]): string {
           return `<button type="button" class="alert-path" data-alert-path="${escapeHtml(location.path)}" data-alert-line="${location.line ?? ""}" data-alert-id="${escapeHtml(finding.id)}" aria-label="Open ${escapeHtml(location.path)} in the lens">${escapeHtml(location.path)}${line}${symbol}</button>`;
         })
         .join("");
-      return `<li class="sev-${finding.severity}"><strong>${escapeHtml(finding.id)}</strong> <em>${escapeHtml(finding.severity)}</em>${finding.agentScore == null ? "" : ` <span class="agent-score">agent ${finding.agentScore}</span>`} ${escapeHtml(finding.description)}${buttons}</li>`;
+      return `<tr class="sev-${finding.severity}"><td>${escapeHtml(finding.id)}</td><td class="sev">${escapeHtml(finding.severity)}</td><td class="issue">${escapeHtml(finding.description)}</td><td class="fix">${escapeHtml(finding.recommendation)}</td><td class="paths">${buttons}</td><td>${escapeHtml(finding.pr)}</td></tr>`;
     })
-    .join("")}</ol>`;
+    .join("");
+  return `<div class="alerts-wrap alerts"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col">Issue</th><th scope="col">Recommendation</th><th scope="col">Path</th><th scope="col">PR</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function symbolButton(
@@ -561,14 +579,26 @@ function renderTree(branch: {
 
 function scoreCard(score: ReviewScore): string {
   const label = verdictLabel(score.verdict);
-  const agent =
-    score.agentScore == null
-      ? ""
-      : `<p class="quiet">Agent score ${score.agentScore}</p>`;
-  return `<section class="verdict verdict-${score.verdict}" aria-label="Astroidal score ${score.value}, ${label}"><p class="eyebrow">Astroidal score</p><p class="verdict-row"><b>${score.value}</b><span class="verdict-label">${label}</span></p><p class="quiet">${escapeHtml(score.reason)}</p>${agent}</section>`;
+  return `<section class="verdict verdict-${score.verdict}" aria-label="Astroidal score ${score.value}, ${label}"><p class="eyebrow">Astroidal score</p><p class="verdict-row"><b>${score.value}</b><span class="verdict-label">${label}</span></p><p class="quiet">${escapeHtml(score.reason)}</p></section>`;
 }
 
-function impactSurface(impact: Graph["impact"]): string {
+function changeSummaryMarkup(
+  summary: ChangeSummary | null | undefined,
+): string {
+  if (!summary)
+    return '<p class="quiet" id="change-summary-empty">No change summary yet.</p>';
+  const bullets =
+    summary.bullets.length === 0
+      ? ""
+      : `<ul>${summary.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+  return `<section class="change-summary" aria-label="Change summary"><h2>Changes</h2><p class="headline">${escapeHtml(summary.headline)}</p>${bullets}</section>`;
+}
+
+function impactSurface(
+  impact: MergedImpact | ImpactScores,
+  complexityRaw: number,
+  breakdown?: ImpactBreakdown,
+): string {
   const blast = clampScore(impact.blastRadius);
   const complexity = clampScore(impact.complexityDelta);
   const security = clampScore(impact.securityExposure);
@@ -583,7 +613,15 @@ function impactSurface(impact: Graph["impact"]): string {
     security,
     performance,
   );
-  return `<svg class="surface" viewBox="0 0 320 312" role="img" aria-label="Impact surface. Blast ${blast}. Complexity ${signed(impact.complexityRaw)}. Security ${security}. Performance ${performance}.">
+  const explanation = breakdown
+    ? `<div class="impact-breakdown" aria-label="Impact score breakdown">
+      <p>Blast <span>${breakdown.blast.merged}</span> = map ${breakdown.blast.map}${breakdown.blast.agent == null ? "" : ` · agent ${breakdown.blast.agent} → residual ${breakdown.blast.agentRisk}`}</p>
+      <p>Complexity <span>${breakdown.complexity.merged}</span> = map ${breakdown.complexity.map}${breakdown.complexity.agent == null ? "" : ` · agent ${breakdown.complexity.agent} → residual ${breakdown.complexity.agentRisk}`}</p>
+      <p>Security <span>${breakdown.security.merged}</span> = map ${breakdown.security.map}${breakdown.security.agent == null ? "" : ` · agent ${breakdown.security.agent} → residual ${breakdown.security.agentRisk}`}</p>
+      <p>Performance <span>${breakdown.performance.merged}</span> = map ${breakdown.performance.map}${breakdown.performance.agent == null ? "" : ` · agent ${breakdown.performance.agent} → residual ${breakdown.performance.agentRisk}`}</p>
+    </div>`
+    : "";
+  return `<svg class="surface" viewBox="0 0 320 312" role="img" aria-label="Impact surface. Blast ${blast}. Complexity ${signed(complexityRaw)}. Security ${security}. Performance ${performance}.">
     <defs><radialGradient id="astroid-fill" cx="50%" cy="50%" r="65%"><stop offset="0%" stop-color="#7F00FF" stop-opacity="0.45" /><stop offset="78%" stop-color="#00F2FE" stop-opacity="0.16" /></radialGradient></defs>
     <path class="guide" d="${guide}" />
     <line class="axis" x1="160" y1="48" x2="160" y2="264" />
@@ -594,14 +632,14 @@ function impactSurface(impact: Graph["impact"]): string {
     ${cuspMark(160 - (security / 100) * 108, 156, "#FFB020")}
     ${cuspMark(160, 156 + (performance / 100) * 108, "#9AF7FF")}
     <text class="axis-name" x="160" y="22" text-anchor="middle">Complexity</text>
-    <text class="axis-value" x="160" y="40" text-anchor="middle" fill="#D2B4FF">${signed(impact.complexityRaw)}</text>
+    <text class="axis-value" x="160" y="40" text-anchor="middle" fill="#D2B4FF">${signed(complexityRaw)}</text>
     <text class="axis-name" x="276" y="150" text-anchor="start">Blast</text>
     <text class="axis-value" x="276" y="168" text-anchor="start" fill="#00F2FE">${blast}</text>
     <text class="axis-name" x="44" y="150" text-anchor="end">Security</text>
     <text class="axis-value" x="44" y="168" text-anchor="end" fill="#FFB020">${security}</text>
     <text class="axis-name" x="160" y="286" text-anchor="middle">Performance</text>
     <text class="axis-value" x="160" y="304" text-anchor="middle" fill="#9AF7FF">${performance}</text>
-  </svg>`;
+  </svg>${explanation}`;
 }
 
 function cuspMark(x: number, y: number, color: string): string {

@@ -1305,6 +1305,7 @@
     });
 
   var reviewPanel = document.getElementById("review-panel");
+  var summaryPanel = document.getElementById("summary-panel");
   var impactPanel = document.getElementById("impact-panel");
   var alertsPanel = document.getElementById("alerts-panel");
   var unitFold = document.getElementById("unit-fold");
@@ -1359,10 +1360,6 @@
   function scoreCardMarkup(score) {
     if (!score) return "";
     var label = verdictLabel(score.verdict);
-    var agent =
-      score.agentScore == null
-        ? ""
-        : '<p class="quiet">Agent score ' + score.agentScore + "</p>";
     return (
       '<section class="verdict verdict-' +
       escapeHtml(score.verdict) +
@@ -1376,13 +1373,51 @@
       escapeHtml(label) +
       '</span></p><p class="quiet">' +
       escapeHtml(score.reason || "") +
+      "</p></section>"
+    );
+  }
+
+  function changeSummaryMarkup(summary) {
+    if (!summary || !summary.headline)
+      return '<p class="quiet" id="change-summary-empty">No change summary yet.</p>';
+    var bullets =
+      Array.isArray(summary.bullets) && summary.bullets.length > 0
+        ? "<ul>" +
+          summary.bullets
+            .map(function (item) {
+              return "<li>" + escapeHtml(item) + "</li>";
+            })
+            .join("") +
+          "</ul>"
+        : "";
+    return (
+      '<section class="change-summary" aria-label="Change summary"><h2>Changes</h2><p class="headline">' +
+      escapeHtml(summary.headline) +
       "</p>" +
-      agent +
+      bullets +
       "</section>"
     );
   }
 
-  function impactSurfaceMarkup(impact) {
+  function axisBreakdownLine(label, axis) {
+    if (!axis) return "";
+    var agent =
+      axis.agent == null
+        ? ""
+        : " · agent " + axis.agent + " → residual " + axis.agentRisk;
+    return (
+      "<p>" +
+      label +
+      " <span>" +
+      axis.merged +
+      "</span> = map " +
+      axis.map +
+      agent +
+      "</p>"
+    );
+  }
+
+  function impactSurfaceMarkup(impact, complexityRaw, breakdown) {
     if (!impact) return "";
     var blast = clampScore(impact.blastRadius);
     var complexity = clampScore(impact.complexityDelta);
@@ -1398,13 +1433,25 @@
       security,
       performance,
     );
-    var complexityRaw =
-      typeof impact.complexityRaw === "number" ? impact.complexityRaw : 0;
+    var raw =
+      typeof complexityRaw === "number"
+        ? complexityRaw
+        : typeof impact.complexityRaw === "number"
+          ? impact.complexityRaw
+          : 0;
+    var explanation = breakdown
+      ? '<div class="impact-breakdown" aria-label="Impact score breakdown">' +
+        axisBreakdownLine("Blast", breakdown.blast) +
+        axisBreakdownLine("Complexity", breakdown.complexity) +
+        axisBreakdownLine("Security", breakdown.security) +
+        axisBreakdownLine("Performance", breakdown.performance) +
+        "</div>"
+      : "";
     return (
       '<svg class="surface" viewBox="0 0 320 312" role="img" aria-label="Impact surface. Blast ' +
       blast +
       ". Complexity " +
-      signed(complexityRaw) +
+      signed(raw) +
       ". Security " +
       security +
       ". Performance " +
@@ -1433,7 +1480,7 @@
       '" r="3.5" fill="#9AF7FF" />' +
       '<text class="axis-name" x="160" y="22" text-anchor="middle">Complexity</text>' +
       '<text class="axis-value" x="160" y="40" text-anchor="middle" fill="#D2B4FF">' +
-      signed(complexityRaw) +
+      signed(raw) +
       "</text>" +
       '<text class="axis-name" x="276" y="150" text-anchor="start">Blast</text>' +
       '<text class="axis-value" x="276" y="168" text-anchor="start" fill="#00F2FE">' +
@@ -1446,7 +1493,8 @@
       '<text class="axis-name" x="160" y="286" text-anchor="middle">Performance</text>' +
       '<text class="axis-value" x="160" y="304" text-anchor="middle" fill="#9AF7FF">' +
       performance +
-      "</text></svg>"
+      "</text></svg>" +
+      explanation
     );
   }
 
@@ -1454,15 +1502,9 @@
     if (!list || list.length === 0)
       return '<p class="quiet">No cusp alerts on this map.</p>';
     return (
-      '<ol class="alerts">' +
+      '<div class="alerts-wrap alerts"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col">Issue</th><th scope="col">Recommendation</th><th scope="col">Path</th><th scope="col">PR</th></tr></thead><tbody>' +
       list
         .map(function (finding) {
-          var agent =
-            finding.agentScore == null
-              ? ""
-              : ' <span class="agent-score">agent ' +
-                finding.agentScore +
-                "</span>";
           var locations = findingLocations(finding);
           var buttons = locations
             .map(function (location) {
@@ -1491,22 +1533,25 @@
             })
             .join("");
           return (
-            '<li class="sev-' +
+            '<tr class="sev-' +
             escapeHtml(finding.severity) +
-            '"><strong>' +
+            '"><td>' +
             escapeHtml(finding.id) +
-            "</strong> <em>" +
+            '</td><td class="sev">' +
             escapeHtml(finding.severity) +
-            "</em>" +
-            agent +
-            " " +
+            '</td><td class="issue">' +
             escapeHtml(finding.description) +
+            '</td><td class="fix">' +
+            escapeHtml(finding.recommendation || "") +
+            '</td><td class="paths">' +
             buttons +
-            "</li>"
+            "</td><td>" +
+            escapeHtml(finding.pr || "") +
+            "</td></tr>"
           );
         })
         .join("") +
-      "</ol>"
+      "</tbody></table></div>"
     );
   }
 
@@ -1528,8 +1573,28 @@
   function applyUnitPanel() {
     var unit = filter === "all" ? null : unitsById[filter];
     var score = unit && unit.score ? unit.score : data.score;
-    var impact =
+    var mapImpact =
       unit && impactByUnit[unit.id] ? impactByUnit[unit.id] : data.impact || {};
+    var impact =
+      score && score.impact
+        ? score.impact
+        : {
+            blastRadius: mapImpact.blastRadius,
+            complexityDelta: mapImpact.complexityDelta,
+            securityExposure: mapImpact.securityExposure,
+            performanceImpact: mapImpact.performanceImpact,
+          };
+    var breakdown = score && score.breakdown ? score.breakdown : null;
+    var complexityRaw =
+      typeof mapImpact.complexityRaw === "number"
+        ? mapImpact.complexityRaw
+        : data.impact && typeof data.impact.complexityRaw === "number"
+          ? data.impact.complexityRaw
+          : 0;
+    var summary =
+      unit && unit.changeSummary
+        ? unit.changeSummary
+        : data.changeSummary || null;
     var list =
       unit == null
         ? findings
@@ -1537,7 +1602,13 @@
             return finding.pr === unit.label;
           });
     if (reviewPanel) reviewPanel.innerHTML = scoreCardMarkup(score);
-    if (impactPanel) impactPanel.innerHTML = impactSurfaceMarkup(impact);
+    if (summaryPanel) summaryPanel.innerHTML = changeSummaryMarkup(summary);
+    if (impactPanel)
+      impactPanel.innerHTML = impactSurfaceMarkup(
+        impact,
+        complexityRaw,
+        breakdown,
+      );
     if (alertsPanel) {
       alertsPanel.innerHTML = alertsMarkup(list);
       bindAlertPaths(alertsPanel);
