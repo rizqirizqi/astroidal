@@ -34,6 +34,7 @@ function usage() {
 
 Options:
   --dry-run          Print steps without changing anything
+  --skip-lint        Skip npm run lint
   --skip-tests       Skip npm test
   --skip-publish     Skip npm publish
   --skip-github      Skip GitHub Release
@@ -49,6 +50,7 @@ function parseArgs(argv) {
   const options = {
     version: null,
     dryRun: false,
+    skipLint: false,
     skipTests: false,
     skipPublish: false,
     skipGithub: false,
@@ -63,6 +65,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === "-h" || arg === "--help") options.help = true;
     else if (arg === "--dry-run") options.dryRun = true;
+    else if (arg === "--skip-lint") options.skipLint = true;
     else if (arg === "--skip-tests") options.skipTests = true;
     else if (arg === "--skip-publish") options.skipPublish = true;
     else if (arg === "--skip-github") options.skipGithub = true;
@@ -139,10 +142,7 @@ function requireCleanTree(options) {
   if (!status) return;
 
   const lines = status.split("\n").filter(Boolean);
-  const allowed = new Set([
-    "packages/cli/package.json",
-    "package-lock.json",
-  ]);
+  const allowed = new Set(["packages/cli/package.json", "package-lock.json"]);
   const unexpected = lines.filter((line) => {
     const path = line.slice(3).trim().split(" -> ").at(-1);
     return !allowed.has(path);
@@ -170,8 +170,7 @@ function requireTools(options) {
       cwd: ROOT,
       encoding: "utf8",
     });
-    if (whoami.status !== 0)
-      fail("Not logged in to npm. Run: npm login");
+    if (whoami.status !== 0) fail("Not logged in to npm. Run: npm login");
   }
 
   if (!options.skipGithub && !options.dryRun) {
@@ -180,16 +179,16 @@ function requireTools(options) {
       encoding: "utf8",
       stdio: "ignore",
     });
-    if (auth.status !== 0) fail("GitHub CLI is not authenticated. Run: gh auth login");
+    if (auth.status !== 0)
+      fail("GitHub CLI is not authenticated. Run: gh auth login");
   }
 }
 
 function previousTag() {
-  const result = spawnSync(
-    "git",
-    ["describe", "--tags", "--abbrev=0"],
-    { cwd: ROOT, encoding: "utf8" },
-  );
+  const result = spawnSync("git", ["describe", "--tags", "--abbrev=0"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
   if (result.status !== 0) return null;
   return result.stdout.trim() || null;
 }
@@ -257,7 +256,9 @@ async function confirm(options, message) {
   if (options.yes || options.dryRun) return;
   const rl = createInterface({ input, output });
   try {
-    const answer = (await rl.question(`${message} [y/N] `)).trim().toLowerCase();
+    const answer = (await rl.question(`${message} [y/N] `))
+      .trim()
+      .toLowerCase();
     if (answer !== "y" && answer !== "yes") fail("Aborted.");
   } finally {
     rl.close();
@@ -321,11 +322,16 @@ async function main() {
   console.log(`Version: ${current}${needsBump ? ` → ${version}` : ""}`);
   console.log(`Tag:     ${tag}`);
   console.log(
-    `Steps:   test${!options.skipTests ? "" : " (skip)"} → commit → tag → push${!options.skipPush ? "" : " (skip)"} → GitHub Release${!options.skipGithub ? "" : " (skip)"} → npm publish${!options.skipPublish ? "" : " (skip)"}`,
+    `Steps:   lint${!options.skipLint ? "" : " (skip)"} → test${!options.skipTests ? "" : " (skip)"} → commit → tag → push${!options.skipPush ? "" : " (skip)"} → GitHub Release${!options.skipGithub ? "" : " (skip)"} → npm publish${!options.skipPublish ? "" : " (skip)"}`,
   );
   if (options.dryRun) console.log("Mode:    dry-run");
 
   await confirm(options, `Release ${PACKAGE_NAME}@${version}?`);
+
+  if (!options.skipLint) {
+    if (options.dryRun) console.log("$ npm run lint");
+    else run("npm", ["run", "lint"]);
+  }
 
   if (!options.skipTests) {
     if (options.dryRun) console.log("$ npm test");
@@ -341,7 +347,9 @@ async function main() {
     const locked = lock.packages?.["packages/cli"]?.version;
     if (locked !== version) {
       if (options.dryRun)
-        console.log(`$ sync package-lock.json packages/cli version → ${version}`);
+        console.log(
+          `$ sync package-lock.json packages/cli version → ${version}`,
+        );
       else setCliVersion(version);
     }
   }
@@ -382,9 +390,13 @@ async function main() {
 
   console.log(`\nReleased ${PACKAGE_NAME}@${version}`);
   if (!options.skipGithub && !options.dryRun)
-    console.log(`GitHub: https://github.com/rizqirizqi/astroidal/releases/tag/${tag}`);
+    console.log(
+      `GitHub: https://github.com/rizqirizqi/astroidal/releases/tag/${tag}`,
+    );
   if (!options.skipPublish && !options.dryRun)
-    console.log(`npm: https://www.npmjs.com/package/${PACKAGE_NAME}/v/${version}`);
+    console.log(
+      `npm: https://www.npmjs.com/package/${PACKAGE_NAME}/v/${version}`,
+    );
 }
 
 main().catch((error) => {
