@@ -478,7 +478,7 @@ function Setup() {
               Agent prompt
             </p>
             <p className="font-brand-secondary text-[11px] text-brand-primary">
-              $ npx --yes astroidal
+              $ npx --yes astroidal@latest
             </p>
           </div>
           <pre className="overflow-x-auto p-5 font-brand-secondary text-[13px] leading-6 whitespace-pre-wrap text-brand-text">

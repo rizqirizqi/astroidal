@@ -75,7 +75,7 @@ export default function Footer() {
       <div className="border-t border-white/15">
         <p className="mx-auto max-w-6xl px-4 py-5 font-brand-secondary text-xs text-[#A8B3C7] sm:px-6">
           © {year} Astroidal. MIT License. Install with{" "}
-          <span className="text-brand-text">npx --yes astroidal</span>.
+          <span className="text-brand-text">npx --yes astroidal@latest</span>.
         </p>
       </div>
     </footer>

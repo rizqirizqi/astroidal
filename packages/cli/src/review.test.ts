@@ -21,6 +21,7 @@ import { githubSlug, gitlabSlug } from "./forge.js";
 import { renderConstellation } from "./html.js";
 import { assignUnitScores, rankFindings, renderReview } from "./rank.js";
 import { languageFor, parseSyntax } from "./syntax.js";
+import { isNpmInstall, shouldReexecToLatest } from "./update.js";
 import type { Graph } from "./types.js";
 
 test("parseArgs splits pull request lists and repeated labels", () => {
@@ -2243,6 +2244,50 @@ function captureLog(run: () => void): string {
   }
   return lines.join("\n");
 }
+
+test("outdated npm installs re-exec to latest; local checkouts do not", () => {
+  assert.equal(
+    shouldReexecToLatest({
+      skip: false,
+      npmInstall: true,
+      current: "0.2.0",
+      latest: "0.3.0",
+    }),
+    true,
+  );
+  assert.equal(
+    shouldReexecToLatest({
+      skip: false,
+      npmInstall: true,
+      current: "0.3.0",
+      latest: "0.3.0",
+    }),
+    false,
+  );
+  assert.equal(
+    shouldReexecToLatest({
+      skip: true,
+      npmInstall: true,
+      current: "0.2.0",
+      latest: "0.3.0",
+    }),
+    false,
+  );
+  assert.equal(
+    shouldReexecToLatest({
+      skip: false,
+      npmInstall: false,
+      current: "0.2.0",
+      latest: "0.3.0",
+    }),
+    false,
+  );
+  assert.equal(isNpmInstall("/tmp/node_modules/astroidal"), true);
+  assert.equal(
+    isNpmInstall("/home/dev/projects/astroidal/packages/cli"),
+    false,
+  );
+});
 
 function rewriteStamp(dir: string, version: string): void {
   const path = join(dir, ".install.json");

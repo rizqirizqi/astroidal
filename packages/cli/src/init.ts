@@ -236,7 +236,7 @@ function skillSource(): string {
   return join(packageRoot(), "skills", "astroidal");
 }
 
-function packageVersion(): string {
+export function packageVersion(): string {
   const pkg = JSON.parse(
     readFileSync(join(packageRoot(), "package.json"), "utf8"),
   ) as { version?: string };
@@ -315,7 +315,7 @@ function hashFile(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
-function compareVersions(left: string, right: string): number {
+export function compareVersions(left: string, right: string): number {
   const parse = (value: string) =>
     value.split(".").map((part) => {
       const match = /^(\d+)/.exec(part);

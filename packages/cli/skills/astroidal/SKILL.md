@@ -52,19 +52,20 @@ Do not add Astroidal as a dependency. Do not edit `package.json`, lockfiles, `py
 
 ## Run it
 
-Resolve the command in this order:
+Always run through npm's latest package — do not use a global `astroidal` on `PATH` (it can stay on an old release):
 
-1. `astroidal` if it is already on `PATH`
-2. `npx --yes astroidal`
+```bash
+npx --yes astroidal@latest <command>
+```
 
-If the package name cannot be downloaded, and the user pointed at a local checkout, run `npx --yes <path-to-the-astroidal-package>` or `node <path>/dist/cli.js`.
+A published install that is behind npm also re-runs itself with `@latest` when invoked. If the package name cannot be downloaded, and the user pointed at a local checkout, run `npx --yes <path-to-the-astroidal-package>` or `node <path>/dist/cli.js`.
 
 ### Repo setup (do this before the first `graph`)
 
 People may install this skill with `npx skills add` or with `astroidal init`. Either way, before the first review in a repository, run init once so the repo is ready:
 
 ```bash
-npx --yes astroidal init
+npx --yes astroidal@latest init
 ```
 
 That adds `.astroidal/` to `.gitignore` when a `.gitignore` exists, and writes the install stamp used for refresh. Skip init when `.astroidal/` is already ignored and the skill is already present for the agents you need. Do not pass `--force` just because the skill was installed via `npx skills` — keep that copy unless the user asked to replace it.
@@ -72,9 +73,9 @@ That adds `.astroidal/` to `.gitignore` when a `.gitignore` exists, and writes t
 Pass `--agent` to copy the skill into one agent's own directory. Repeat it, or pass `all`.
 
 ```bash
-npx --yes astroidal init --agent cursor
-npx --yes astroidal init --agent claude
-npx --yes astroidal init --agent copilot
+npx --yes astroidal@latest init --agent cursor
+npx --yes astroidal@latest init --agent claude
+npx --yes astroidal@latest init --agent copilot
 ```
 
 `--agent cursor` writes `.cursor/skills/astroidal`. `--agent claude` writes `.claude/skills/astroidal`. `--agent copilot` writes `.github/skills/astroidal`. `--agent codex` is the default `.agents/skills/astroidal` directory.
@@ -82,7 +83,7 @@ npx --yes astroidal init --agent copilot
 Pass `--global` to install it once for every repository on this machine. A global Copilot copy is `~/.copilot/skills/astroidal`.
 
 ```bash
-npx --yes astroidal init --global
+npx --yes astroidal@latest init --global
 ```
 
 A global install updates when a newer Astroidal runs `graph` or `rank`, as long as those skill files are still the ones Astroidal wrote. An edited skill stays in place until `init --force`. Run `init` again to refresh a project install.
@@ -97,18 +98,18 @@ Set up the repo if needed, choose the scope, build the map once, and gather only
 
 Run `graph` once (after repo setup above). Read the scope note it prints. If that scope is wrong, rerun once with the flag below. Do not rerun after that.
 
-| Ask                                                         | Command                                                                     |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Current edits, including untracked files                    | `npx --yes astroidal graph`                                                 |
-| This branch or its pull request, when the worktree is dirty | `npx --yes astroidal graph --base <default-branch>`                         |
-| A clean feature branch                                      | `npx --yes astroidal graph`                                                 |
-| Pull request numbers or URLs                                | `npx --yes astroidal graph --pr 12,18,24`                                   |
-| All open pull requests                                      | `npx --yes astroidal graph --open`                                          |
-| Open pull requests by author, label, or base                | `npx --yes astroidal graph --open --author NAME --label NAME --base BRANCH` |
-| The current pull request and the stack under it             | `npx --yes astroidal graph --stack`                                         |
-| One commit                                                  | `npx --yes astroidal graph --commit SHA`                                    |
-| Staged changes only                                         | `npx --yes astroidal graph --staged`                                        |
-| Unstaged changes and untracked files                        | `npx --yes astroidal graph --unstaged`                                      |
+| Ask                                                         | Command                                                                            |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Current edits, including untracked files                    | `npx --yes astroidal@latest graph`                                                 |
+| This branch or its pull request, when the worktree is dirty | `npx --yes astroidal@latest graph --base <default-branch>`                         |
+| A clean feature branch                                      | `npx --yes astroidal@latest graph`                                                 |
+| Pull request numbers or URLs                                | `npx --yes astroidal@latest graph --pr 12,18,24`                                   |
+| All open pull requests                                      | `npx --yes astroidal@latest graph --open`                                          |
+| Open pull requests by author, label, or base                | `npx --yes astroidal@latest graph --open --author NAME --label NAME --base BRANCH` |
+| The current pull request and the stack under it             | `npx --yes astroidal@latest graph --stack`                                         |
+| One commit                                                  | `npx --yes astroidal@latest graph --commit SHA`                                    |
+| Staged changes only                                         | `npx --yes astroidal@latest graph --staged`                                        |
+| Unstaged changes and untracked files                        | `npx --yes astroidal@latest graph --unstaged`                                      |
 
 A batch is one merged map. Do not review the pull requests as separate reports. When the batch is large enough, use sub-agents for the search as above, then merge into one findings file.
 
@@ -277,7 +278,7 @@ Use a short name and at least two mapped paths. Omit `groups` when nothing extra
 Then run the first rank:
 
 ```bash
-npx --yes astroidal rank
+npx --yes astroidal@latest rank
 ```
 
 Rank appends one row to `.astroidal/log.jsonl`: the head, the verdict, the score, and each cusp's path, symbol, and quote. Leave that log in place.
@@ -322,7 +323,7 @@ Update `.astroidal/findings.json`:
 Then rank again:
 
 ```bash
-npx --yes astroidal rank
+npx --yes astroidal@latest rank
 ```
 
 If this second rank is still `Review`, do not stop: print the updated "still needs review" list again, finish any missing `checked` paths, raise or lower each `agentScores` axis to match the deeper pass, and keep hunting until you either file a real finding or can clear with high confidence on every axis. Rank allows a covered, high-confidence clear to become `Passed` even when map impact is high. Do not invent a bug to escape `Review`. Do not rank more than once more after Verification fixes quote/path drops.
@@ -390,7 +391,7 @@ GitHub:
 gh pr review <number> --approve --body "Astroidal Passed. Cusps clear."
 ```
 
-Optional: post or refresh the score comment with `npx --yes astroidal comment --pr <number>` when the person wants the chart link on the PR.
+Optional: post or refresh the score comment with `npx --yes astroidal@latest comment --pr <number>` when the person wants the chart link on the PR.
 
 GitLab:
 

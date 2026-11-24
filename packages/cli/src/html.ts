@@ -60,7 +60,7 @@ export function renderConstellation(graph: Graph): string {
           graph.units.map((unit) => unit.label).join(", ") || "local changes",
         );
   const verdictText = verdictLabel(review.verdict);
-  const shareLine = `Astroidal ${review.value} · ${verdictText} on ${graph.repoName}. The AI code review map — blast radius, bug map, and a score. npx --yes astroidal graph`;
+  const shareLine = `Astroidal ${review.value} · ${verdictText} on ${graph.repoName}. The AI code review map — blast radius, bug map, and a score. npx --yes astroidal@latest graph`;
 
   return `<!DOCTYPE html>
 <html lang="en">

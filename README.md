@@ -34,15 +34,15 @@ Copy setup prompt for your agent:
 ```text
 Set up Astroidal and review. Do not add it as a dependency. Run:
 
-npx --yes astroidal init
+npx --yes astroidal@latest init
 
 If the user has not named a change, commit, or pull request to review, ask what to review before mapping. Then run graph for that scope (for example graph, graph --pr N, graph --commit SHA, graph --staged, or graph --open):
 
-npx --yes astroidal graph
+npx --yes astroidal@latest graph
 
 Follow the installed Astroidal skill: search the bug map and write .astroidal/findings.json. Then run:
 
-npx --yes astroidal rank
+npx --yes astroidal@latest rank
 
 Reply with the score, Passed, Review, or Fix first, and the paths to .astroidal/review.md and .astroidal/constellation.html.
 ```
@@ -62,11 +62,11 @@ Command flags, exit codes, hosts (`gh` / `glab`), and the full output layout are
 ## Scope
 
 ```bash
-npx --yes astroidal graph --pr 12,18,24
-npx --yes astroidal graph --open --label risk
-npx --yes astroidal graph --stack
-npx --yes astroidal graph --commit HEAD
-npx --yes astroidal graph --staged
+npx --yes astroidal@latest graph --pr 12,18,24
+npx --yes astroidal@latest graph --open --label risk
+npx --yes astroidal@latest graph --stack
+npx --yes astroidal@latest graph --commit HEAD
+npx --yes astroidal@latest graph --staged
 ```
 
 ## Repository

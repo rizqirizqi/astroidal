@@ -11,7 +11,7 @@ Requires Node.js 20+.
 ## Run
 
 ```bash
-npx --yes astroidal <command>
+npx --yes astroidal@latest <command>
 ```
 
 Do not add Astroidal as a project dependency. `astroidal --help` lists every flag.
@@ -28,7 +28,7 @@ Install the Astroidal skill and ignore `.astroidal/`.
 | `--global`                             | Install for every repository                    |
 | `--force`                              | Replace a skill you edited                      |
 
-Default skill path: `.agents/skills/astroidal/` (Codex). Agent copies go to `.cursor/skills`, `.claude/skills`, or `.github/skills`. A global Copilot copy is `~/.copilot/skills/astroidal/`. An unmodified global skill refreshes on `graph` or `rank` when Astroidal is newer.
+Default skill path: `.agents/skills/astroidal/` (Codex). Agent copies go to `.cursor/skills`, `.claude/skills`, or `.github/skills`. A global Copilot copy is `~/.copilot/skills/astroidal/`. An unmodified global skill refreshes on `graph` or `rank` when Astroidal is newer. Prefer `npx --yes astroidal@latest` so runs are not stuck on an old global install; an outdated npm install also re-runs itself with `@latest`.
 
 ### `graph`
 
@@ -41,16 +41,16 @@ Build the change map and packets under `.astroidal/`.
 | Batch          | One merged map; each PR also gets Passed, Review, or Fix first |
 
 ```bash
-npx --yes astroidal graph
-npx --yes astroidal graph --pr 12,18,24
-npx --yes astroidal graph --open --label risk
-npx --yes astroidal graph --stack
-npx --yes astroidal graph --commit HEAD
-npx --yes astroidal graph --staged
-npx --yes astroidal graph --unstaged
-npx --yes astroidal graph --author @me
-npx --yes astroidal graph --base main
-npx --yes astroidal graph --repo owner/name
+npx --yes astroidal@latest graph
+npx --yes astroidal@latest graph --pr 12,18,24
+npx --yes astroidal@latest graph --open --label risk
+npx --yes astroidal@latest graph --stack
+npx --yes astroidal@latest graph --commit HEAD
+npx --yes astroidal@latest graph --staged
+npx --yes astroidal@latest graph --unstaged
+npx --yes astroidal@latest graph --author @me
+npx --yes astroidal@latest graph --base main
+npx --yes astroidal@latest graph --repo owner/name
 ```
 
 Local branches use git. `gh` lists open GitHub PRs and fetches a remote diff. `glab` does the same for GitLab MRs. Host comes from the origin remote, or from the glab config for self-hosted GitLab.
@@ -72,8 +72,8 @@ Keeps critical, high, and medium findings that quote a real line in the change o
 Write one pull-request comment with the score, verdict, and cusp paths. Re-running updates that same comment. Does not approve, merge, or request reviewers.
 
 ```bash
-npx --yes astroidal comment
-npx --yes astroidal comment --pr 12
+npx --yes astroidal@latest comment
+npx --yes astroidal@latest comment --pr 12
 ```
 
 Pass `--pr` when the map has no pull request, or when it covers more than one. A batch lists one verdict per PR; the merged map stays one score.

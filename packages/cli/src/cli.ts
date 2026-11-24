@@ -18,16 +18,17 @@ import { writePackets } from "./packets.js";
 import { readRepoFile, resolveScope } from "./scope.js";
 import { postComment } from "./comment.js";
 import { assignUnitScores, rankFindings, renderReview } from "./rank.js";
+import { reexecIfOutdated } from "./update.js";
 import type { AgentScores, Graph, GraphOptions } from "./types.js";
 
 const HELP = `Astroidal is the AI code review map, scorer, and helper.
 It draws the blast radius, hands an agent a bug map, and scores the review into a clear verdict.
 It does not add itself as a dependency.
 
-  npx --yes astroidal init
-  npx --yes astroidal graph
-  npx --yes astroidal rank
-  npx --yes astroidal comment
+  npx --yes astroidal@latest init
+  npx --yes astroidal@latest graph
+  npx --yes astroidal@latest rank
+  npx --yes astroidal@latest comment
 
 graph
   --pr 12,18          Explicit pull requests. Local branches are diffed with git.
@@ -70,6 +71,7 @@ init
 Codex reads the default .agents/skills copy. --agent copilot uses
 .github/skills in a repo and ~/.copilot/skills for --global.
 graph and rank update an unmodified global skill when this package is newer.
+An outdated npm/global install re-runs itself with npx astroidal@latest.
 `;
 
 export function main(argv: string[]): number {
@@ -101,7 +103,7 @@ export function main(argv: string[]): number {
         "Astroidal skill installed. The AI code review map is ready.",
         "No dependency was added.",
         ...notes,
-        "Map a change with: npx --yes astroidal graph",
+        "Map a change with: npx --yes astroidal@latest graph",
         "Then open .astroidal/constellation.html and share the score.",
       ].join("\n"),
     );
@@ -200,7 +202,7 @@ export function main(argv: string[]): number {
     console.log(
       [
         refreshGlobalSkill(),
-        `Kept ${ranked.findings.length} findings. Dropped ${ranked.dropped.length}.\nWrote .astroidal/review.md and updated .astroidal/constellation.html\nShare: Astroidal ${graph.score.value} · ${verdict} on ${graph.repoName}. The AI code review map. npx --yes astroidal graph${reviewCue}`,
+        `Kept ${ranked.findings.length} findings. Dropped ${ranked.dropped.length}.\nWrote .astroidal/review.md and updated .astroidal/constellation.html\nShare: Astroidal ${graph.score.value} · ${verdict} on ${graph.repoName}. The AI code review map. npx --yes astroidal@latest graph${reviewCue}`,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -357,7 +359,9 @@ function isDirectRun(): boolean {
 
 if (isDirectRun()) {
   try {
-    process.exitCode = main(process.argv.slice(2));
+    const argv = process.argv.slice(2);
+    const redirected = reexecIfOutdated(argv);
+    process.exitCode = redirected != null ? redirected : main(argv);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
