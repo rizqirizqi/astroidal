@@ -188,19 +188,14 @@ Write `.astroidal/findings.json`:
     "label": "Short title of the change",
     "children": [
       {
-        "label": "Auth path",
-        "detail": "What this branch of the change does",
-        "paths": ["src/auth.ts", "src/session.ts"],
+        "label": "Sign-in flow",
+        "detail": "How a person gets a session after typing a password",
         "children": [
           {
-            "label": "Login binds the password",
-            "paths": ["src/auth.ts"],
-            "symbols": ["login"]
+            "label": "Password stays out of logs"
           },
           {
-            "label": "Session resume trusts the user id",
-            "paths": ["src/session.ts"],
-            "symbols": ["resume"]
+            "label": "Resume reuses the signed-in user"
           }
         ]
       },
@@ -209,8 +204,6 @@ Write `.astroidal/findings.json`:
         "children": [
           {
             "label": "Password can leak to logs",
-            "paths": ["src/auth.ts"],
-            "symbols": ["login"],
             "finding": true
           }
         ]
@@ -255,11 +248,26 @@ One finding can cover several files or symbols. Prefer `locations` when the bug 
 
 `summary` (the change summary) is required for the constellation: one headline sentence plus a short bullet list of what changed. For a batch, also set `unitSummaries` keyed by pull request number or unit label. Local or single-PR maps only need that change `summary`. When there are findings, also put one ultra-short bullet per finding in the change `summary.bullets` (or the matching `unitSummaries` bullets), using that finding's plain `summary` field — issue and fix in one breath.
 
-`mindmap` is required for the constellation Map view. You author it: a diagram of the change as a person would explain it — flows, features, contracts, and risks — not a dump of AST symbols or every function the map already listed. Nest `children` by story. Prefer about 5–20 nodes total, depth at most four. Each node needs a short `label`. Optional `detail` is one plain sentence. Attach mapped `paths` and `symbols` when a node lands on real code so the chart can focus those stars. Set `"finding": true` on nodes that represent a filed cusp. For a batch, also set `unitMindmaps` keyed like `unitSummaries`. Omit empty `children`. Do not invent paths or symbols the map does not have — rank drops unknown ones.
+### Map vs Sky (do not mix)
 
-Say what breaks, name the symbol, and give the change that removes the bug. For security and architecture, say why that change holds. Do not hedge, restate the quoted line, or file a question. An empty `findings` array is valid only after the added lines of every non-test source file have been checked against the catalog and none of them contain an important bug.
+The constellation has two tabs. Put each kind of content in the right place:
 
-When changed files belong together for a reason the directory does not already show, name that group. The Sky chart draws a directory on its own, and it draws an import as a line. A group is for a flow, a feature, or a shared contract that crosses those.
+| Tab     | What it is                                | What you write                                                                        |
+| ------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| **Map** | Agent-authored change mindmap (`mindmap`) | Plain-language story: flows, features, contracts, risks, cusps                        |
+| **Sky** | Orbital constellation from the graph      | Files, symbols, directories, imports/calls — plus your `groups` and finding locations |
+
+**Map is the story, not the filesystem.** Write `mindmap` the way you would explain the change to a teammate at a whiteboard. Do **not** put file paths, symbol names, package names, code, quotes, API jargon, or directory trees in a Map node's `label` or `detail`. Those belong on Sky (via the graph) and in `findings` / `groups`.
+
+`mindmap` is required for the Map tab. Nest `children` by story. Prefer about 5–20 nodes total, depth at most four. Each node needs a short plain `label` (under ~6 words). Optional `detail` is one plain sentence a non-engineer can skim — same ban on paths, symbols, and code as finding `summary`. Set `"finding": true` on nodes that represent a filed cusp; the cusp node's label should match the finding's plain `summary` idea, not the path. For a batch, also set `unitMindmaps` keyed like `unitSummaries`. Omit empty `children`.
+
+**Do not dump the bug map into Map.** Wrong Map content: one node per file, one node per function, labels like `src/auth.ts` or `login()`, trees that mirror directories, or `detail` that restates quotes/recommendations. Right Map content: "Sign-in flow" → "Password stays out of logs" → cusp "Password can leak to logs".
+
+**Optional focus links only.** You may attach mapped `paths` and `symbols` on a mindmap node so Map can highlight related Sky stars — but they are silent metadata, not Map copy. Prefer omitting them on ordinary story nodes. If you attach them, still keep `label`/`detail` free of those strings. Never invent paths or symbols the map does not have — rank drops unknown ones.
+
+**Technical detail goes in findings and groups (Sky).** Say what breaks, name the symbol, and give the change that removes the bug in each finding's `description`, `recommendation`, `path`, `quote`, and `locations`. For security and architecture, say why that change holds there — not on the Map. Do not hedge, restate the quoted line, or file a question. An empty `findings` array is valid only after the added lines of every non-test source file have been checked against the catalog and none of them contain an important bug.
+
+When changed files belong together for a reason the directory does not already show, name that group. **Groups are Sky-only:** the Sky chart draws a directory on its own, and it draws an import as a line. A group is for a flow, a feature, or a shared contract that crosses those. Do not recreate those file lists as Map nodes.
 
 ```json
 {
@@ -318,7 +326,7 @@ Update `.astroidal/findings.json`:
 - Complete `checked` for every non-test source file in Added lines
 - Set `agentScores` honestly after the deeper pass (high on an axis only when you would clear that surface; keep an axis low when doubt remains there and you found no cusp yet)
 - Refresh `summary` / `unitSummaries` so the constellation still describes the change
-- Refresh `mindmap` / `unitMindmaps` so the Map view still diagrams the change (flows and cusps, not an AST dump)
+- Refresh `mindmap` / `unitMindmaps` so the Map tab still diagrams the change as a plain-language story (flows and cusps only — no file/symbol dump; technical detail stays in findings and on Sky)
 
 Then rank again:
 
@@ -345,9 +353,9 @@ For a clear (`findings: []`):
 - Confirm `checked` lists every required non-test Added-lines file
 - Confirm every `agentScores` axis is at least 80 after Re-review
 - Confirm `summary` (and `unitSummaries` for a batch) still matches the change
-- Confirm `mindmap` (and `unitMindmaps` for a batch) still diagrams the change
+- Confirm `mindmap` (and `unitMindmaps` for a batch) still diagrams the change as a plain story for Map
 
-Also confirm the mindmap is present whenever you wrote findings: root label, nested children for the story of the change, cusp nodes marked `finding: true` when findings remain.
+Also confirm the mindmap is present whenever you wrote findings: root label, nested children for the story of the change, cusp nodes marked `finding: true` when findings remain. Before rank, skim every mindmap `label` and `detail`: if any contains a file path, symbol name, code snippet, or directory dump, rewrite that node in plain language and leave the technical strings in `findings` / `groups` for Sky.
 
 If rank dropped a finding because the quote or path is wrong, fix that finding once and rank again. Do not invent a replacement bug to keep the count up. After that fix-up rank, do not rank again.
 
