@@ -74,6 +74,8 @@ export function renderConstellation(graph: Graph): string {
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Astroidal · ${escapeHtml(graph.repoName)} · ${review.value} ${verdictText}">
   <meta name="twitter:description" content="${escapeHtml(shareLine)}">
+  <link rel="icon" href="${faviconDataUri()}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="${faviconDataUri()}">
   <style>
     :root {
       color-scheme: dark;
@@ -737,6 +739,11 @@ function astroidMarkup(
     commands.push(`${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`);
   }
   return `<path d="${commands.join(" ")} Z" fill="none" stroke="#00F2FE" stroke-width="${stroke}" />`;
+}
+
+function faviconDataUri(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0C111C"/>${astroidMarkup(32, 32, 22, 3)}</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 function countSpectral(
