@@ -148,8 +148,43 @@ export function renderConstellation(graph: Graph): string {
     .batch button:hover, .lens-controls button:hover, .view-toggle button:hover, .symbols button:hover, summary:hover { border-color: rgba(0, 242, 254, 0.55); }
     .batch button.is-on { border-color: var(--cyan); color: var(--cyan); background: rgba(0, 242, 254, 0.08); }
     .batch .batch-unit.is-on .batch-findings { color: rgba(0, 242, 254, 0.78); }
-    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(440px, 560px); min-height: 0; }
+    main {
+      --aside-width: min(560px, max(320px, 38vw));
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 8px var(--aside-width);
+      min-height: 0;
+    }
     .sky, aside { min-height: 0; }
+    .aside-split {
+      position: relative;
+      z-index: 2;
+      width: 8px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-left: 1px solid var(--line);
+      border-right: 1px solid transparent;
+      background: transparent;
+      cursor: col-resize;
+      touch-action: none;
+    }
+    .aside-split::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 2px;
+      height: 36px;
+      border-radius: 999px;
+      background: rgba(232, 238, 248, 0.28);
+      transform: translate(-50%, -50%);
+    }
+    .aside-split:hover, .aside-split:focus-visible, body.is-resizing .aside-split {
+      border-left-color: rgba(0, 242, 254, 0.55);
+      background: rgba(0, 242, 254, 0.06);
+    }
+    .aside-split:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+    body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-select: none !important; }
     .sky { position: relative; min-width: 0; outline: none; display: flex; flex-direction: column; }
     .sky:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
     canvas { width: 100%; flex: 1; min-height: 0; display: block; cursor: grab; }
@@ -270,16 +305,21 @@ export function renderConstellation(graph: Graph): string {
     .diff-table tr.hunk td { padding: 8px 10px; color: #c5b6e0; background: rgba(127, 0, 255, 0.16); }
     .diff-table tr.is-mark { box-shadow: inset 3px 0 0 var(--cyan); }
     .alert { color: var(--amber); }
-    .alerts-wrap { margin: 0 0 16px; overflow-x: auto; }
-    .alerts-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    .alerts-table th, .alerts-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .alerts-wrap { margin: 0 0 16px; overflow-x: hidden; max-width: 100%; }
+    .alerts-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
+    .alerts-table th, .alerts-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
     .alerts-table th { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+    .alerts-table th:nth-child(1), .alerts-table td:nth-child(1) { width: 3.2rem; }
+    .alerts-table th:nth-child(2), .alerts-table td:nth-child(2) { width: 4.2rem; }
+    .alerts-table th:nth-child(3), .alerts-table td:nth-child(3) { width: 28%; }
+    .alerts-table th:nth-child(6), .alerts-table td:nth-child(6) { width: 18%; }
+    .alerts-table th:nth-child(7), .alerts-table td:nth-child(7) { width: 3.2rem; }
     .alerts-table .sev { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; color: var(--muted); white-space: nowrap; }
     .alerts-table tr.sev-critical .sev { color: var(--amber); }
     .alerts-table tr.sev-high .sev { color: var(--violet-ink); }
-    .alerts-table .issue, .alerts-table .fix, .alerts-table .summary { line-height: 1.4; }
-    .alerts-table .paths { display: grid; gap: 4px; }
-    .alerts .alert-path { display: block; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: var(--cyan); font: 12px/1.4 "JetBrains Mono", ui-monospace, monospace; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+    .alerts-table .issue, .alerts-table .fix, .alerts-table .summary { line-height: 1.4; white-space: normal; }
+    .alerts-table .paths { display: grid; gap: 4px; min-width: 0; }
+    .alerts .alert-path { display: block; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: var(--cyan); font: 12px/1.4 "JetBrains Mono", ui-monospace, monospace; text-align: left; text-decoration: underline; text-underline-offset: 3px; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
     .alerts .alert-path:hover { color: var(--ink); }
     .symbol-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
     .symbol-head h2 { margin: 0; }
@@ -309,6 +349,7 @@ export function renderConstellation(graph: Graph): string {
       body { display: block; }
       header, .meta { align-items: flex-start; flex-direction: column; justify-items: start; }
       main { grid-template-columns: 1fr; }
+      .aside-split { display: none; }
       .sky { height: 72vh; }
       aside { border-left: 0; border-top: 1px solid var(--line); min-height: 70vh; }
       .aside-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
@@ -356,7 +397,8 @@ export function renderConstellation(graph: Graph): string {
         <p class="hint">A cloud is a directory. Violet is a named group. A line is an import or a call. Orange marks a finding.</p>
       </div>
     </section>
-    <aside aria-label="Review panels">
+    <button type="button" class="aside-split" id="aside-split" aria-label="Resize review panel" title="Drag to resize"></button>
+    <aside aria-label="Review panels" id="review-aside">
       <div class="aside-shell">
         <div class="aside-panels">
           <section id="panel-score" class="panel-stack" role="tabpanel" aria-labelledby="tab-score">

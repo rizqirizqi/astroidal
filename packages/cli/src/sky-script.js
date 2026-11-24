@@ -1726,6 +1726,75 @@
   }
   if (symbolFilter) symbolFilter.addEventListener("input", applySymbolFilter);
 
+  (function bindAsideResize() {
+    var split = document.getElementById("aside-split");
+    var main = document.querySelector("main");
+    if (!split || !main) return;
+    var storageKey = "astroidal-aside-width";
+    var minAside = 280;
+    var minSky = 240;
+    var saved = Number(window.localStorage && localStorage.getItem(storageKey));
+    if (Number.isFinite(saved) && saved >= minAside)
+      main.style.setProperty("--aside-width", Math.round(saved) + "px");
+    var dragState = null;
+    function clampWidth(width) {
+      var total = main.getBoundingClientRect().width;
+      var maxAside = Math.max(minAside, total - minSky - 8);
+      return Math.max(minAside, Math.min(maxAside, width));
+    }
+    function applyWidth(width) {
+      var next = clampWidth(width);
+      main.style.setProperty("--aside-width", Math.round(next) + "px");
+      return next;
+    }
+    split.addEventListener("pointerdown", function (event) {
+      if (window.matchMedia && window.matchMedia("(max-width: 860px)").matches)
+        return;
+      event.preventDefault();
+      var aside = document.getElementById("review-aside");
+      dragState = {
+        startX: event.clientX,
+        startWidth: aside ? aside.getBoundingClientRect().width : 480,
+      };
+      document.body.classList.add("is-resizing");
+      split.setPointerCapture(event.pointerId);
+    });
+    split.addEventListener("pointermove", function (event) {
+      if (!dragState) return;
+      var delta = dragState.startX - event.clientX;
+      applyWidth(dragState.startWidth + delta);
+      resize();
+    });
+    function endDrag(event) {
+      if (!dragState) return;
+      var aside = document.getElementById("review-aside");
+      var width = aside ? aside.getBoundingClientRect().width : 0;
+      if (width > 0 && window.localStorage)
+        localStorage.setItem(storageKey, String(Math.round(width)));
+      dragState = null;
+      document.body.classList.remove("is-resizing");
+      if (event && split.hasPointerCapture(event.pointerId))
+        split.releasePointerCapture(event.pointerId);
+      resize();
+    }
+    split.addEventListener("pointerup", endDrag);
+    split.addEventListener("pointercancel", endDrag);
+    split.addEventListener("keydown", function (event) {
+      var step = event.shiftKey ? 48 : 16;
+      var aside = document.getElementById("review-aside");
+      var current = aside ? aside.getBoundingClientRect().width : 480;
+      if (event.key === "ArrowLeft") {
+        applyWidth(current + step);
+        event.preventDefault();
+        resize();
+      } else if (event.key === "ArrowRight") {
+        applyWidth(current - step);
+        event.preventDefault();
+        resize();
+      }
+    });
+  })();
+
   window.addEventListener("resize", resize);
   showDetail(null);
   resize();
