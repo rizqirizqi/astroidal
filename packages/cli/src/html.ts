@@ -386,8 +386,8 @@ export function renderConstellation(graph: Graph): string {
     ${allTab}${units}
   </div>
   <main>
-    <section class="sky" tabindex="0" aria-label="Change map. Arrow keys move the map. Plus and minus lens in and out.">
-      <p class="sr">${graph.summary.symbols} changed symbols and ${graph.summary.neighbors} neighbors. A cyan cloud is one directory. A violet dashed cloud is a group named in the review. A line is an import or a call. Logic is a circle, contract is a diamond, text is a square, and orbit neighbors are rings. An orange shape marks a finding on that symbol; one finding can cover several files or symbols.</p>
+    <section class="sky" tabindex="0" aria-label="Change map. Scroll pans up and down. Shift+scroll pans left and right. Ctrl or Cmd+scroll zooms. Space+drag pans. Arrow keys move. Plus and minus zoom.">
+      <p class="sr">${graph.summary.symbols} changed symbols and ${graph.summary.neighbors} neighbors. A cyan cloud is one directory. A violet dashed cloud is a group named in the review. A line is an import or a call. Logic is a circle, contract is a diamond, text is a square, and orbit neighbors are rings. An orange shape marks a finding on that symbol; one finding can cover several files or symbols. Scroll pans. Shift+scroll pans sideways. Ctrl or Cmd+scroll zooms. Hold Space and drag to pan.</p>
       <canvas id="sky"></canvas>
       <div id="tip" hidden></div>
       <div class="lens-bar">
@@ -396,7 +396,7 @@ export function renderConstellation(graph: Graph): string {
           <button type="button" id="lens-out">Lens out</button>
           <button type="button" id="lens-fit">Fit</button>
         </div>
-        <p class="hint">A cloud is a directory. Violet is a named group. A line is an import or a call. Orange marks a finding.</p>
+        <p class="hint">Scroll pans · Shift+scroll sideways · Ctrl/⌘+scroll zooms · Space+drag pans. Cloud = directory. Violet = group. Orange = finding.</p>
       </div>
     </section>
     <button type="button" class="aside-split" id="aside-split" aria-label="Resize review panel" title="Drag to resize"></button>

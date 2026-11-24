@@ -56,6 +56,7 @@
   var drag = null;
   var pan = null;
   var down = null;
+  var spaceDown = false;
   var filter = "all";
   var moved = false;
   var clusters = [];
@@ -1179,6 +1180,20 @@
     }, pool[0]);
   }
 
+  function setCanvasCursor(pointing) {
+    if (pan) canvas.style.cursor = "grabbing";
+    else if (spaceDown) canvas.style.cursor = "grab";
+    else if (pointing) canvas.style.cursor = "pointer";
+    else canvas.style.cursor = "grab";
+  }
+
+  function panCamera(dx, dy) {
+    moved = true;
+    camera.x += dx / camera.scale;
+    camera.y += dy / camera.scale;
+    scheduleDraw();
+  }
+
   canvas.addEventListener("mousemove", function (event) {
     var point = localPoint(event);
     if (
@@ -1194,43 +1209,48 @@
       return;
     }
     if (pan) {
-      moved = true;
-      camera.x += (point.x - pan.x) / camera.scale;
-      camera.y += (point.y - pan.y) / camera.scale;
+      panCamera(point.x - pan.x, point.y - pan.y);
       pan.x = point.x;
       pan.y = point.y;
-      scheduleDraw();
+      setCanvasCursor(false);
       return;
     }
     var next = nodeAt(point.x, point.y);
     if (next !== hover) {
       hover = next;
-      canvas.style.cursor = hover ? "pointer" : "grab";
+      setCanvasCursor(Boolean(hover) && !spaceDown);
       scheduleDraw();
-    }
+    } else setCanvasCursor(Boolean(hover) && !spaceDown);
     showTip(hover, point.x, point.y);
   });
 
   canvas.addEventListener("mousedown", function (event) {
     var point = localPoint(event);
     var node = nodeAt(point.x, point.y);
-    down = { x: point.x, y: point.y, node: node, was: selected, moved: false };
-    if (node) {
-      var world = toWorld(point.x, point.y);
-      drag = { node: node, dx: node.x - world.x, dy: node.y - world.y };
-      if (selected !== node) {
-        selected = node;
-        showDetail(node);
-        revealLensDetail();
-        scheduleDraw();
-      }
+    down = {
+      x: point.x,
+      y: point.y,
+      node: spaceDown ? null : node,
+      was: selected,
+      moved: false,
+    };
+    if (spaceDown || event.button === 1 || !node) {
+      pan = { x: point.x, y: point.y };
+      setCanvasCursor(false);
       return;
     }
-    pan = { x: point.x, y: point.y };
+    var world = toWorld(point.x, point.y);
+    drag = { node: node, dx: node.x - world.x, dy: node.y - world.y };
+    if (selected !== node) {
+      selected = node;
+      showDetail(node);
+      revealLensDetail();
+      scheduleDraw();
+    }
   });
 
   canvas.addEventListener("mouseleave", function () {
-    canvas.style.cursor = "grab";
+    setCanvasCursor(false);
     if (hover) {
       hover = null;
       scheduleDraw();
@@ -1239,7 +1259,7 @@
   });
 
   window.addEventListener("mouseup", function () {
-    if (down && !down.moved) {
+    if (down && !down.moved && !spaceDown) {
       var sameStar = down.node && down.was === down.node;
       if (sameStar || (!down.node && selected)) {
         selected = null;
@@ -1250,6 +1270,7 @@
     drag = null;
     pan = null;
     down = null;
+    setCanvasCursor(Boolean(hover) && !spaceDown);
   });
 
   canvas.addEventListener(
@@ -1257,10 +1278,43 @@
     function (event) {
       event.preventDefault();
       var point = localPoint(event);
-      zoom(event.deltaY > 0 ? 0.92 : 1.08, point.x, point.y);
+      if (event.ctrlKey || event.metaKey) {
+        var factor = event.deltaY > 0 ? 0.92 : 1.08;
+        if (Math.abs(event.deltaY) > 40)
+          factor = event.deltaY > 0 ? 0.85 : 1.18;
+        zoom(factor, point.x, point.y);
+        return;
+      }
+      var dx = 0;
+      var dy = 0;
+      if (event.shiftKey) {
+        dx = event.deltaX !== 0 ? event.deltaX : event.deltaY;
+      } else {
+        dx = event.deltaX;
+        dy = event.deltaY;
+      }
+      if (dx === 0 && dy === 0) return;
+      panCamera(-dx, -dy);
     },
     { passive: false },
   );
+
+  window.addEventListener("keydown", function (event) {
+    if (event.code !== "Space" && event.key !== " ") return;
+    if (event.target && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName))
+      return;
+    if (!spaceDown) {
+      spaceDown = true;
+      setCanvasCursor(Boolean(hover));
+    }
+    if (event.target === sky || event.target === canvas) event.preventDefault();
+  });
+
+  window.addEventListener("keyup", function (event) {
+    if (event.code !== "Space" && event.key !== " ") return;
+    spaceDown = false;
+    if (!pan) setCanvasCursor(Boolean(hover));
+  });
 
   sky.addEventListener("keydown", function (event) {
     var step = 48 / camera.scale;
