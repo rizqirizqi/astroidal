@@ -202,6 +202,7 @@ export interface RankedFinding {
   severity: Severity;
   agentScore: number | null;
   description: string;
+  summary: string;
   path: string;
   line: number | null;
   recommendation: string;

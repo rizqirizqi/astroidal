@@ -85,7 +85,8 @@ export function commentBody(graph: Graph): string {
                 return `\`${location.path}${line}\`${symbol}`;
               })
               .join(", ");
-            return `- ${where} ${finding.id}`;
+            const blurb = finding.summary || finding.description;
+            return `- ${finding.id} (${finding.severity}): ${blurb} — ${where}`;
           }),
         ].join("\n");
   const units = (graph.units ?? []).flatMap((unit) => {
@@ -94,12 +95,20 @@ export function commentBody(graph: Graph): string {
       `${unit.label}: ${unit.score.value} · ${verdictLabel(unit.score.verdict)}`,
     ];
   });
+  const change = graph.changeSummary
+    ? [
+        graph.changeSummary.headline,
+        ...graph.changeSummary.bullets.map((bullet) => `- ${bullet}`),
+        "",
+      ]
+    : [];
   return [
     MARKER,
     `Astroidal ${score.value} · ${verdict}`,
     "",
     score.reason,
     "",
+    ...change,
     ...(units.length > 0 ? [...units, ""] : []),
     cusps,
     "",

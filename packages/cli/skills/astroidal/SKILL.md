@@ -188,6 +188,7 @@ Write `.astroidal/findings.json`:
       "pr": 12,
       "severity": "high",
       "agentScore": 90,
+      "summary": "Login can leak passwords into the database log. Bind the password instead of building the query as text.",
       "description": "What breaks, in one or two sentences.",
       "path": "src/auth.ts",
       "quote": "the exact line copied from the file",
@@ -212,11 +213,13 @@ Write `.astroidal/findings.json`:
 
 `severity` is `critical`, `high`, or `medium`, using the gate in the catalog. `critical` is a crash, data loss, authz bypass, injection, or secret exposure on a path users hit. `high` is a realistic wrong result, lost write, race, or broken contract. `medium` is a realistic edge that fails. `quote` is one exact line copied from an added-lines block, the mapped file, or its one-hop neighbor. Set `pr` to the pull request that introduced that line, or omit it for a local change.
 
+`summary` is required on every finding. Write one or two plain sentences a non-engineer can skim: what goes wrong, then what to do. No symbol names, no file paths, no API jargon, no code. Keep it under ~160 characters. `description` and `recommendation` stay technical for the table; `summary` is the human line for the Summary column, the review paste, and the PR comment.
+
 One finding can cover several files or symbols. Prefer `locations` when the bug spans more than one place: each entry needs a mapped `path`, and at least one entry needs a verifiable `quote`. Optional `symbol` names the mapped symbol. You can also pass related `paths` or `symbols` beside a primary `path` + `quote`. The constellation keeps each symbol's shape and paints the finding's member stars orange.
 
 `agentScores` rates confidence to pass each impact surface from 0 to 100: blast (caller/neighbor reach), complexity (decision density), security (trust and authz), and performance (hot paths). 100 means you would clear that surface. Rank merges those scores into the impact chart and withholds `Passed` until every axis is at least 80, `checked` is complete, and no cusp remains. Prefer `agentScores` over a single top-level `agentScore`; a lone number still expands to all four axes for older files. `agentScore` on a finding is 0 to 100: how sure you are that the quoted line breaks. Omit a finding's `agentScore` only when you are fully sure; rank then treats it as 100.
 
-`summary` is required for the constellation: one headline sentence plus a short bullet list of what changed. For a batch, also set `unitSummaries` keyed by pull request number or unit label. Local or single-PR maps only need `summary`.
+`summary` (the change summary) is required for the constellation: one headline sentence plus a short bullet list of what changed. For a batch, also set `unitSummaries` keyed by pull request number or unit label. Local or single-PR maps only need that change `summary`. When there are findings, also put one ultra-short bullet per finding in the change `summary.bullets` (or the matching `unitSummaries` bullets), using that finding's plain `summary` field — issue and fix in one breath.
 
 Say what breaks, name the symbol, and give the change that removes the bug. For security and architecture, say why that change holds. Do not hedge, restate the quoted line, or file a question. An empty `findings` array is valid only after the added lines of every non-test source file have been checked against the catalog and none of them contain an important bug.
 
@@ -315,7 +318,7 @@ If rank dropped a finding because the quote or path is wrong, fix that finding o
 Write a short prose summary in chat. Open with a line the person can paste: `Astroidal {score} · Passed` or `Astroidal {score} · Fix first`.
 
 - **Passed** — no important findings after Review + Re-review + Verification; every added block was checked; every impact-surface agent score is at least 80. A person can skip the detail.
-- **Fix first** — cusp alerts remain; name the highest-severity issues and the recommendations.
+- **Fix first** — cusp alerts remain. After the paste line, list each finding as one ultra-short sentence from its `summary` field (plain issue + fix). Do not paste the technical description table.
 - **Review** is only a mid-loop cue: coverage is incomplete or an `agentScores` axis is still below 80. Do not paste it as the final line. If you must pause mid-loop, the pause message still lists exactly what remains to review.
 
 Do not paste `Review` as the final line. If rank somehow still says `Review` after Re-review and Verification, name the remaining gaps, keep hunting or adjust `checked` / `agentScores`, and rank once more until the verdict is `Passed` or `Fix first`. Then name the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart.

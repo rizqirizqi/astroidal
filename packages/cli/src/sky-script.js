@@ -1502,7 +1502,7 @@
     if (!list || list.length === 0)
       return '<p class="quiet">No cusp alerts on this map.</p>';
     return (
-      '<div class="alerts-wrap alerts"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col">Issue</th><th scope="col">Recommendation</th><th scope="col">Path</th><th scope="col">PR</th></tr></thead><tbody>' +
+      '<div class="alerts-wrap alerts"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col">Summary</th><th scope="col">Issue</th><th scope="col">Recommendation</th><th scope="col">Path</th><th scope="col">PR</th></tr></thead><tbody>' +
       list
         .map(function (finding) {
           var locations = findingLocations(finding);
@@ -1539,6 +1539,8 @@
             escapeHtml(finding.id) +
             '</td><td class="sev">' +
             escapeHtml(finding.severity) +
+            '</td><td class="summary">' +
+            escapeHtml(finding.summary || finding.description || "") +
             '</td><td class="issue">' +
             escapeHtml(finding.description) +
             '</td><td class="fix">' +

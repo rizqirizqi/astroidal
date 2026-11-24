@@ -61,6 +61,7 @@ interface RawFinding {
   severity?: string;
   description?: string;
   issue?: string;
+  summary?: string;
   path?: string;
   file?: string;
   line?: number;
@@ -194,6 +195,7 @@ export function rankFindings(
       severity,
       agentScore: clampScore(item.agentScore),
       description,
+      summary: findingSummary(item.summary, description, recommendation),
       path: evidence.path,
       line: evidence.line,
       recommendation,
@@ -216,6 +218,7 @@ export function rankFindings(
     if (SEVERITY_RANK[finding.severity] < SEVERITY_RANK[previous.severity]) {
       previous.severity = finding.severity;
       previous.recommendation = finding.recommendation;
+      previous.summary = finding.summary;
       previous.line = finding.line;
       previous.agentScore = finding.agentScore;
       previous.quote = finding.quote;
@@ -292,15 +295,23 @@ export function renderReview(graph: Graph, result: RankResult): string {
       "",
     );
   }
+  if (result.findings.length > 0) {
+    lines.push("## Findings", "");
+    for (const finding of result.findings)
+      lines.push(
+        `- ${finding.id} (${finding.severity}): ${finding.summary || finding.description}`,
+      );
+    lines.push("");
+  }
   lines.push(
-    "| ID | Severity | Issue | Recommendation | Path | PR |",
-    "| --- | --- | --- | --- | --- | --- |",
+    "| ID | Severity | Summary | Issue | Recommendation | Path | PR |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
   );
   if (result.findings.length === 0)
-    lines.push("| | | No confirmed findings. | | | |");
+    lines.push("| | | No confirmed findings. | | | | |");
   for (const finding of result.findings) {
     lines.push(
-      `| ${cell(finding.id)} | ${cell(finding.severity)} | ${cell(finding.description)} | ${cell(finding.recommendation)} | ${cell(formatPath(finding))} | ${cell(finding.pr)} |`,
+      `| ${cell(finding.id)} | ${cell(finding.severity)} | ${cell(finding.summary)} | ${cell(finding.description)} | ${cell(finding.recommendation)} | ${cell(formatPath(finding))} | ${cell(finding.pr)} |`,
     );
   }
   lines.push("");
@@ -702,6 +713,19 @@ function parseChangeSummary(value: unknown): ChangeSummary | null {
         .slice(0, 12)
     : [];
   return { headline: headline.slice(0, 280), bullets };
+}
+
+function findingSummary(
+  raw: unknown,
+  description: string,
+  recommendation: string,
+): string {
+  if (typeof raw === "string" && raw.trim())
+    return raw.trim().replace(/\s+/g, " ").slice(0, 160);
+  const issue = description.trim().replace(/\s+/g, " ");
+  const fix = recommendation.trim().replace(/\s+/g, " ");
+  const combined = fix ? `${issue} Fix: ${fix}` : issue;
+  return combined.slice(0, 160);
 }
 
 function readChecked(input: unknown): Set<string> {

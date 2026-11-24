@@ -277,7 +277,7 @@ export function renderConstellation(graph: Graph): string {
     .alerts-table .sev { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; color: var(--muted); white-space: nowrap; }
     .alerts-table tr.sev-critical .sev { color: var(--amber); }
     .alerts-table tr.sev-high .sev { color: var(--violet-ink); }
-    .alerts-table .issue, .alerts-table .fix { line-height: 1.4; }
+    .alerts-table .issue, .alerts-table .fix, .alerts-table .summary { line-height: 1.4; }
     .alerts-table .paths { display: grid; gap: 4px; }
     .alerts .alert-path { display: block; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: var(--cyan); font: 12px/1.4 "JetBrains Mono", ui-monospace, monospace; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
     .alerts .alert-path:hover { color: var(--ink); }
@@ -493,10 +493,10 @@ function alertsMarkup(findings: RankedFinding[]): string {
           return `<button type="button" class="alert-path" data-alert-path="${escapeHtml(location.path)}" data-alert-line="${location.line ?? ""}" data-alert-id="${escapeHtml(finding.id)}" aria-label="Open ${escapeHtml(location.path)} in the lens">${escapeHtml(location.path)}${line}${symbol}</button>`;
         })
         .join("");
-      return `<tr class="sev-${finding.severity}"><td>${escapeHtml(finding.id)}</td><td class="sev">${escapeHtml(finding.severity)}</td><td class="issue">${escapeHtml(finding.description)}</td><td class="fix">${escapeHtml(finding.recommendation)}</td><td class="paths">${buttons}</td><td>${escapeHtml(finding.pr)}</td></tr>`;
+      return `<tr class="sev-${finding.severity}"><td>${escapeHtml(finding.id)}</td><td class="sev">${escapeHtml(finding.severity)}</td><td class="summary">${escapeHtml(finding.summary || finding.description)}</td><td class="issue">${escapeHtml(finding.description)}</td><td class="fix">${escapeHtml(finding.recommendation)}</td><td class="paths">${buttons}</td><td>${escapeHtml(finding.pr)}</td></tr>`;
     })
     .join("");
-  return `<div class="alerts-wrap alerts"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col">Issue</th><th scope="col">Recommendation</th><th scope="col">Path</th><th scope="col">PR</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="alerts-wrap alerts"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col">Summary</th><th scope="col">Issue</th><th scope="col">Recommendation</th><th scope="col">Path</th><th scope="col">PR</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function symbolButton(

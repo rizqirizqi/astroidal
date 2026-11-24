@@ -138,7 +138,7 @@ export function main(argv: string[]): number {
       join(root, ".astroidal", "findings.json");
     if (!existsSync(findingsPath)) {
       throw new CommandError(
-        `Write findings to ${findingsPath} before rank.\nEach finding needs severity, description, path, quote, and recommendation.`,
+        `Write findings to ${findingsPath} before rank.\nEach finding needs severity, summary, description, path, quote, and recommendation.`,
       );
     }
     const graph = JSON.parse(readFileSync(graphPath, "utf8")) as Graph;

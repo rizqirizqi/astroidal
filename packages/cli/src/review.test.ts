@@ -896,7 +896,7 @@ test("graph and rank review a worktree without adding a dependency", () => {
     const review = readFileSync(join(root, ".astroidal", "review.md"), "utf8");
     assert.match(
       review,
-      /\| ID \| Severity \| Issue \| Recommendation \| Path \| PR \|/,
+      /\| ID \| Severity \| Summary \| Issue \| Recommendation \| Path \| PR \|/,
     );
     assert.match(review, /A-001/);
     assert.match(review, /src\/auth\.ts/);
@@ -1868,6 +1868,7 @@ test("each pull request keeps its own verdict", () => {
         pr: "PR 12",
         severity: "critical",
         agentScore: 100,
+        summary: "Password can leak into the query log. Bind it instead.",
         description: "The query concatenates the password.",
         path: "src/a.ts",
         line: 1,
@@ -1925,6 +1926,7 @@ test("each pull request keeps its own verdict", () => {
       pr: "PR 12",
       severity: "critical",
       agentScore: 100,
+      summary: "Password can leak into the query log. Bind it instead.",
       description: "The query concatenates the password.",
       path: "src/a.ts",
       line: 1,
