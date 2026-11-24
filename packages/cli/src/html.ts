@@ -307,15 +307,22 @@ export function renderConstellation(graph: Graph): string {
     .diff-table tr.hunk td { padding: 8px 10px; color: #c5b6e0; background: rgba(127, 0, 255, 0.16); }
     .diff-table tr.is-mark { box-shadow: inset 3px 0 0 var(--cyan); }
     .alert { color: var(--amber); }
+    .alerts-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+    .alerts-head h2 { margin: 0; }
     .alerts-wrap { margin: 0 0 16px; overflow-x: hidden; max-width: 100%; }
     .alerts-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
     .alerts-table th, .alerts-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
     .alerts-table th { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
     .alerts-table th:nth-child(1), .alerts-table td:nth-child(1) { width: 3.2rem; }
     .alerts-table th:nth-child(2), .alerts-table td:nth-child(2) { width: 4.2rem; }
-    .alerts-table th:nth-child(3), .alerts-table td:nth-child(3) { width: 28%; }
-    .alerts-table th:nth-child(6), .alerts-table td:nth-child(6) { width: 18%; }
-    .alerts-table th:nth-child(7), .alerts-table td:nth-child(7) { width: 3.2rem; }
+    .alerts-table th.summary-col, .alerts-table td.summary { width: auto; }
+    .alerts-table th.path-col, .alerts-table td.paths { width: 22%; }
+    .alerts-table th.pr-col, .alerts-table td.pr { width: 3.2rem; }
+    .alerts-table th.detail-col, .alerts-table td.detail-col { display: none; width: 22%; }
+    .alerts.show-details .alerts-table th.detail-col,
+    .alerts.show-details .alerts-table td.detail-col { display: table-cell; }
+    .alerts.show-details .alerts-table th.summary-col,
+    .alerts.show-details .alerts-table td.summary { width: 24%; }
     .alerts-table .sev { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; color: var(--muted); white-space: nowrap; }
     .alerts-table tr.sev-critical .sev { color: var(--amber); }
     .alerts-table tr.sev-high .sev { color: var(--violet-ink); }
@@ -360,7 +367,7 @@ export function renderConstellation(graph: Graph): string {
       .hint { display: none; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .batch button, .aside-tabs button, .lens-controls button, .view-toggle button, .symbols button, summary { transition: none; }
+      .batch button, .aside-tabs button, .lens-controls button, .view-toggle button, .symbols button, .alerts-head button, summary { transition: none; }
       .mark { filter: none; }
     }
   </style>
@@ -418,7 +425,13 @@ export function renderConstellation(graph: Graph): string {
             ${unitScores}
           </section>
           <section id="panel-findings" class="panel-stack" role="tabpanel" aria-labelledby="tab-findings" hidden>
-            <h2>Cusp alerts</h2>
+            <div class="alerts-head">
+              <h2>Cusp alerts</h2>
+              <div class="view-toggle" role="group" aria-label="Finding detail">
+                <button type="button" id="alerts-summary" class="is-on" aria-pressed="true">Summary</button>
+                <button type="button" id="alerts-detail" aria-pressed="false">Detail</button>
+              </div>
+            </div>
             <div id="alerts-panel">${alerts}</div>
           </section>
           <section id="panel-lens" class="panel-stack" role="tabpanel" aria-labelledby="tab-lens" hidden>
@@ -537,10 +550,10 @@ function alertsMarkup(findings: RankedFinding[]): string {
           return `<button type="button" class="alert-path" data-alert-path="${escapeHtml(location.path)}" data-alert-line="${location.line ?? ""}" data-alert-id="${escapeHtml(finding.id)}" aria-label="Open ${escapeHtml(location.path)} in the lens">${escapeHtml(location.path)}${line}${symbol}</button>`;
         })
         .join("");
-      return `<tr class="sev-${finding.severity}"><td>${escapeHtml(finding.id)}</td><td class="sev">${escapeHtml(finding.severity)}</td><td class="summary">${escapeHtml(finding.summary || finding.description)}</td><td class="issue">${escapeHtml(finding.description)}</td><td class="fix">${escapeHtml(finding.recommendation)}</td><td class="paths">${buttons}</td><td>${escapeHtml(finding.pr)}</td></tr>`;
+      return `<tr class="sev-${finding.severity}"><td>${escapeHtml(finding.id)}</td><td class="sev">${escapeHtml(finding.severity)}</td><td class="summary">${escapeHtml(finding.summary || finding.description)}</td><td class="issue detail-col">${escapeHtml(finding.description)}</td><td class="fix detail-col">${escapeHtml(finding.recommendation)}</td><td class="paths">${buttons}</td><td class="pr">${escapeHtml(finding.pr)}</td></tr>`;
     })
     .join("");
-  return `<div class="alerts-wrap alerts"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col">Summary</th><th scope="col">Issue</th><th scope="col">Recommendation</th><th scope="col">Path</th><th scope="col">PR</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="alerts-wrap alerts" id="alerts-table-wrap"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col" class="summary-col">Summary</th><th scope="col" class="detail-col">Issue</th><th scope="col" class="detail-col">Recommendation</th><th scope="col" class="path-col">Path</th><th scope="col" class="pr-col">PR</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function symbolButton(

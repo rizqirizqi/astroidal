@@ -1552,11 +1552,15 @@
     );
   }
 
+  var showAlertDetails = false;
+
   function alertsMarkup(list) {
     if (!list || list.length === 0)
       return '<p class="quiet">No cusp alerts on this map.</p>';
     return (
-      '<div class="alerts-wrap alerts"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col">Summary</th><th scope="col">Issue</th><th scope="col">Recommendation</th><th scope="col">Path</th><th scope="col">PR</th></tr></thead><tbody>' +
+      '<div class="alerts-wrap alerts' +
+      (showAlertDetails ? " show-details" : "") +
+      '" id="alerts-table-wrap"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col" class="summary-col">Summary</th><th scope="col" class="detail-col">Issue</th><th scope="col" class="detail-col">Recommendation</th><th scope="col" class="path-col">Path</th><th scope="col" class="pr-col">PR</th></tr></thead><tbody>' +
       list
         .map(function (finding) {
           var locations = findingLocations(finding);
@@ -1595,13 +1599,13 @@
             escapeHtml(finding.severity) +
             '</td><td class="summary">' +
             escapeHtml(finding.summary || finding.description || "") +
-            '</td><td class="issue">' +
+            '</td><td class="issue detail-col">' +
             escapeHtml(finding.description) +
-            '</td><td class="fix">' +
+            '</td><td class="fix detail-col">' +
             escapeHtml(finding.recommendation || "") +
             '</td><td class="paths">' +
             buttons +
-            "</td><td>" +
+            '</td><td class="pr">' +
             escapeHtml(finding.pr || "") +
             "</td></tr>"
           );
@@ -1609,6 +1613,28 @@
         .join("") +
       "</tbody></table></div>"
     );
+  }
+
+  function setAlertDetailMode(mode) {
+    showAlertDetails = mode === "detail";
+    var wrap = document.getElementById("alerts-table-wrap");
+    if (wrap) wrap.classList.toggle("show-details", showAlertDetails);
+    var summaryBtn = document.getElementById("alerts-summary");
+    var detailBtn = document.getElementById("alerts-detail");
+    if (summaryBtn) {
+      summaryBtn.classList.toggle("is-on", !showAlertDetails);
+      summaryBtn.setAttribute(
+        "aria-pressed",
+        showAlertDetails ? "false" : "true",
+      );
+    }
+    if (detailBtn) {
+      detailBtn.classList.toggle("is-on", showAlertDetails);
+      detailBtn.setAttribute(
+        "aria-pressed",
+        showAlertDetails ? "true" : "false",
+      );
+    }
   }
 
   function bindAlertPaths(root) {
@@ -1677,6 +1703,18 @@
     if (unitFold) unitFold.hidden = filter !== "all";
     applySymbolFilter();
   }
+
+  var alertsSummary = document.getElementById("alerts-summary");
+  var alertsDetail = document.getElementById("alerts-detail");
+  if (alertsSummary)
+    alertsSummary.addEventListener("click", function () {
+      setAlertDetailMode("summary");
+    });
+  if (alertsDetail)
+    alertsDetail.addEventListener("click", function () {
+      setAlertDetailMode("detail");
+    });
+  setAlertDetailMode("summary");
 
   document.querySelectorAll(".aside-tabs [data-panel]").forEach(function (tab) {
     tab.addEventListener("click", function () {
