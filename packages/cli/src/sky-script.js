@@ -60,6 +60,11 @@
   var filter = "all";
   var moved = false;
   var clusters = [];
+  var treeLinks = [];
+  var mapStars = [];
+  var selectedMap = null;
+  var hoverMap = null;
+  var mapMode = "map";
   var reduced =
     window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -102,14 +107,31 @@
     draw();
   }
 
-  function layout() {
+  function resetPlacement() {
     clusters = [];
-    var byPath = {};
+    treeLinks = [];
+    mapStars = [];
     nodes.forEach(function (node) {
-      if (node.role !== "changed") return;
-      if (!byPath[node.path]) byPath[node.path] = [];
-      byPath[node.path].push(node);
+      node.placed = false;
     });
+  }
+
+  function activeMindmap() {
+    if (filter !== "all") {
+      var unit = null;
+      (data.units || []).forEach(function (item) {
+        if (item.id === filter) unit = item;
+      });
+      if (unit && unit.mindmap) return unit.mindmap;
+    }
+    return data.mindmap || null;
+  }
+
+  function usingAgentMap() {
+    return mapMode === "map" && mapStars.length > 0;
+  }
+
+  function buildClouds(byPath) {
     var paths = Object.keys(byPath).sort();
     var claimed = {};
     var clouds = [];
@@ -138,6 +160,57 @@
         paths: directories[key],
       });
     });
+    return clouds;
+  }
+
+  function changedByPath() {
+    var byPath = {};
+    nodes.forEach(function (node) {
+      if (node.role !== "changed") return;
+      if (!byPath[node.path]) byPath[node.path] = [];
+      byPath[node.path].push(node);
+    });
+    return byPath;
+  }
+
+  function placeNeighbors() {
+    var neighborSlot = {};
+    nodes
+      .filter(function (node) {
+        return node.role === "neighbor";
+      })
+      .forEach(function (node, index) {
+        var link = linkedChange(node);
+        if (!link) {
+          place(node, Math.cos(index) * 280, Math.sin(index) * 280);
+          return;
+        }
+        var slot = neighborSlot[link.id] || 0;
+        neighborSlot[link.id] = slot + 1;
+        var away = mapMode === "map" ? 0 : Math.atan2(link.y, link.x);
+        var distance = mapMode === "map" ? 54 + slot * 22 : 72 + slot * 26;
+        place(
+          node,
+          link.x + Math.cos(away) * distance,
+          link.y +
+            Math.sin(away) * distance +
+            (mapMode === "map" ? (slot % 2 === 0 ? -18 : 18) : 0),
+        );
+      });
+  }
+
+  function layout() {
+    resetPlacement();
+    selectedMap = null;
+    hoverMap = null;
+    if (mapMode === "sky") layoutSky();
+    else if (activeMindmap()) layoutAgentMap(activeMindmap());
+    else layoutAstMap();
+  }
+
+  function layoutSky() {
+    var byPath = changedByPath();
+    var clouds = buildClouds(byPath);
     clouds.forEach(function (cloud, index) {
       var turn = index * 2.399963;
       var ring = clouds.length === 1 ? 0 : 120 + Math.sqrt(index) * 210;
@@ -196,26 +269,161 @@
       });
       clusters.push({ label: cloud.label, nodes: members, kind: cloud.kind });
     });
-    var neighborSlot = {};
-    nodes
-      .filter(function (node) {
-        return node.role === "neighbor";
-      })
-      .forEach(function (node, index) {
-        var link = linkedChange(node);
-        if (!link) {
-          place(node, Math.cos(index) * 280, Math.sin(index) * 280);
-          return;
-        }
-        var slot = neighborSlot[link.id] || 0;
-        neighborSlot[link.id] = slot + 1;
-        var away = Math.atan2(link.y, link.x);
-        place(
-          node,
-          link.x + Math.cos(away) * (72 + slot * 26),
-          link.y + Math.sin(away) * (72 + slot * 26),
-        );
+    placeNeighbors();
+  }
+
+  function layoutAgentMap(root) {
+    var columnGap = 360;
+    function measure(node, depth) {
+      var kids = (node.children || []).map(function (child) {
+        return measure(child, depth + 1);
       });
+      if (!kids.length) return { node: node, kids: kids, height: 56 };
+      var height =
+        kids.reduce(function (sum, kid) {
+          return sum + kid.height;
+        }, 0) +
+        (kids.length - 1) * 14;
+      // Branch labels sit above the star, so keep a little extra vertical room.
+      return { node: node, kids: kids, height: Math.max(64, height) };
+    }
+    function placeBranch(measured, x, top, parentStar, depth) {
+      var y = top + measured.height / 2;
+      var star = {
+        label: measured.node.label || "Change",
+        detail: measured.node.detail || "",
+        paths: measured.node.paths || [],
+        symbols: measured.node.symbols || [],
+        finding: measured.node.finding === true,
+        x: x,
+        y: y,
+        r: measured.node.finding ? 8 : depth === 0 ? 10 : 6.2,
+        depth: depth,
+        labelAbove: depth < 2,
+      };
+      mapStars.push(star);
+      if (parentStar)
+        treeLinks.push({
+          from: { x: parentStar.x, y: parentStar.y },
+          to: { x: star.x, y: star.y },
+          kind: depth === 1 ? "hub" : depth === 2 ? "dir" : "file",
+        });
+      var cursor = top;
+      measured.kids.forEach(function (kid) {
+        placeBranch(kid, x + columnGap, cursor, star, depth + 1);
+        cursor += kid.height + 14;
+      });
+    }
+    var tree = measure(root, 0);
+    placeBranch(tree, 0, -tree.height / 2, null, 0);
+  }
+
+  function layoutAstMap() {
+    var byPath = changedByPath();
+    var clouds = buildClouds(byPath);
+    var changed = nodes.filter(function (node) {
+      return node.role === "changed";
+    });
+    var hub = {
+      x: 0,
+      y: 0,
+      label: shortHubLabel(data.repoName || "Change"),
+      nodes: changed,
+      kind: "hub",
+    };
+    clusters.push(hub);
+    var symbolGap = changed.length > 80 ? 26 : changed.length > 40 ? 32 : 38;
+    var levels = clouds.map(function (cloud) {
+      var files = cloud.paths
+        .slice()
+        .sort()
+        .map(function (path) {
+          var members = byPath[path].slice().sort(function (left, right) {
+            return left.line - right.line;
+          });
+          return {
+            path: path,
+            nodes: members,
+            height: Math.max(64, members.length * symbolGap + 24),
+          };
+        });
+      var height = files.reduce(function (sum, file) {
+        return sum + file.height;
+      }, 0);
+      return { cloud: cloud, files: files, height: Math.max(88, height) };
+    });
+    var total = levels.reduce(function (sum, level) {
+      return sum + level.height + 28;
+    }, 0);
+    var cursor = levels.length ? -total / 2 : 0;
+    levels.forEach(function (level) {
+      var cloudY = cursor + level.height / 2;
+      var cloudX = 220;
+      level.cloud.x = cloudX;
+      level.cloud.y = cloudY;
+      treeLinks.push({
+        from: { x: hub.x, y: hub.y },
+        to: { x: cloudX, y: cloudY },
+        kind: "hub",
+      });
+      var fileCursor = cursor;
+      level.files.forEach(function (file) {
+        var fileY = fileCursor + file.height / 2;
+        var fileX = 460;
+        treeLinks.push({
+          from: { x: cloudX, y: cloudY },
+          to: { x: fileX, y: fileY },
+          kind: "dir",
+        });
+        file.nodes.forEach(function (node, index) {
+          var symbolY =
+            fileY + (index - (file.nodes.length - 1) / 2) * symbolGap;
+          var symbolX = 700;
+          place(node, symbolX, symbolY);
+          treeLinks.push({
+            from: { x: fileX, y: fileY },
+            to: { x: symbolX, y: symbolY },
+            kind: "file",
+          });
+        });
+        clusters.push({
+          x: fileX,
+          y: fileY,
+          label: fileLabel(file.path),
+          nodes: file.nodes,
+          kind: "file",
+        });
+        fileCursor += file.height;
+      });
+      var members = [];
+      level.cloud.paths.forEach(function (path) {
+        members = members.concat(byPath[path]);
+      });
+      clusters.push({
+        x: cloudX,
+        y: cloudY,
+        label: level.cloud.label,
+        nodes: members,
+        kind: level.cloud.kind,
+      });
+      cursor += level.height + 28;
+    });
+    if (!levels.length && changed.length) {
+      changed.forEach(function (node, index) {
+        place(node, 320, (index - (changed.length - 1) / 2) * symbolGap);
+        treeLinks.push({
+          from: { x: hub.x, y: hub.y },
+          to: { x: node.x, y: node.y },
+          kind: "hub",
+        });
+      });
+    }
+    placeNeighbors();
+  }
+
+  function shortHubLabel(name) {
+    var text = String(name || "Change");
+    return text.length > 28 ? text.slice(0, 27) + "..." : text;
   }
 
   function relax(files) {
@@ -352,12 +560,21 @@
       maxX: -Infinity,
       maxY: -Infinity,
     };
-    nodes.forEach(function (node) {
-      box.minX = Math.min(box.minX, node.x - 120);
-      box.minY = Math.min(box.minY, node.y - 48);
-      box.maxX = Math.max(box.maxX, node.x + 150);
-      box.maxY = Math.max(box.maxY, node.y + 36);
-    });
+    function include(x, y, padX, padY) {
+      box.minX = Math.min(box.minX, x - padX);
+      box.minY = Math.min(box.minY, y - padY);
+      box.maxX = Math.max(box.maxX, x + padX);
+      box.maxY = Math.max(box.maxY, y + padY);
+    }
+    if (usingAgentMap()) {
+      mapStars.forEach(function (star) {
+        include(star.x, star.y, 160, 36);
+      });
+    } else {
+      nodes.forEach(function (node) {
+        include(node.x, node.y, 120, 48);
+      });
+    }
     if (!isFinite(box.minX)) {
       camera.scale = 1;
       camera.x = 0;
@@ -366,9 +583,10 @@
     }
     var spanX = Math.max(box.maxX - box.minX + 160, 280);
     var spanY = Math.max(box.maxY - box.minY + 160, 220);
+    var floor = mapMode === "map" ? 0.18 : 0.38;
     camera.scale = Math.min(
       1.25,
-      Math.max(0.38, Math.min((width - 48) / spanX, (height - 48) / spanY)),
+      Math.max(floor, Math.min((width - 48) / spanX, (height - 48) / spanY)),
     );
     camera.x = -((box.minX + box.maxX) / 2);
     camera.y = -((box.minY + box.maxY) / 2);
@@ -481,9 +699,97 @@
   function edgeActive(edge) {
     var from = byId[edge.from];
     var to = byId[edge.to];
+    if (mapMode === "map")
+      return edgeTouches(edge, hover) || edgeTouches(edge, selected);
     if (from && to && from.path !== to.path) return true;
     if (!hover && !selected) return edges.length <= 80;
     return edgeTouches(edge, hover) || edgeTouches(edge, selected);
+  }
+
+  function drawTreeLinks() {
+    treeLinks.forEach(function (link) {
+      var start = toScreen(link.from.x, link.from.y);
+      var end = toScreen(link.to.x, link.to.y);
+      var midX = (start.x + end.x) / 2;
+      context.strokeStyle =
+        link.kind === "hub"
+          ? "rgba(210,180,255,0.55)"
+          : link.kind === "dir"
+            ? "rgba(0,242,254,0.45)"
+            : "rgba(0,242,254,0.28)";
+      context.lineWidth =
+        link.kind === "hub" ? 1.6 : link.kind === "dir" ? 1.3 : 1;
+      context.beginPath();
+      context.moveTo(start.x, start.y);
+      context.bezierCurveTo(midX, start.y, midX, end.y, end.x, end.y);
+      context.stroke();
+    });
+  }
+
+  function drawHub(cluster) {
+    var point = toScreen(cluster.x, cluster.y);
+    var glow = context.createRadialGradient(
+      point.x,
+      point.y,
+      0,
+      point.x,
+      point.y,
+      42,
+    );
+    glow.addColorStop(0, "rgba(0,242,254,0.55)");
+    glow.addColorStop(1, "rgba(11,15,25,0)");
+    context.fillStyle = glow;
+    context.beginPath();
+    context.arc(point.x, point.y, 42, 0, Math.PI * 2);
+    context.fill();
+    context.beginPath();
+    context.arc(point.x, point.y, 10, 0, Math.PI * 2);
+    context.fillStyle = "#00F2FE";
+    context.fill();
+    context.strokeStyle = "rgba(232,238,248,0.7)";
+    context.lineWidth = 1.25;
+    context.beginPath();
+    context.arc(point.x, point.y, 16, 0, Math.PI * 2);
+    context.stroke();
+  }
+
+  function drawBranch(cluster) {
+    if (typeof cluster.x !== "number" || typeof cluster.y !== "number") return;
+    if (!cluster.nodes.some(isVisible)) return;
+    var point = toScreen(cluster.x, cluster.y);
+    var color =
+      cluster.kind === "logic"
+        ? "#D2B4FF"
+        : cluster.kind === "file"
+          ? "rgba(0,242,254,0.85)"
+          : "#00F2FE";
+    var radius = cluster.kind === "file" ? 5.5 : 7;
+    var glow = context.createRadialGradient(
+      point.x,
+      point.y,
+      0,
+      point.x,
+      point.y,
+      radius * 5,
+    );
+    glow.addColorStop(0, color);
+    glow.addColorStop(1, "rgba(11,15,25,0)");
+    context.fillStyle = glow;
+    context.globalAlpha = 0.7;
+    context.beginPath();
+    context.arc(point.x, point.y, radius * 5, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = 1;
+    context.beginPath();
+    if (cluster.kind === "logic") {
+      context.moveTo(point.x, point.y - radius);
+      context.lineTo(point.x + radius, point.y);
+      context.lineTo(point.x, point.y + radius);
+      context.lineTo(point.x - radius, point.y);
+      context.closePath();
+    } else context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    context.fillStyle = color;
+    context.fill();
   }
 
   function edgeTouches(edge, node) {
@@ -672,7 +978,25 @@
       context.fill();
     });
     context.globalAlpha = 1;
+    if (mapMode === "map") drawTreeLinks();
+    if (usingAgentMap()) {
+      drawAgentMap();
+      return;
+    }
     clusters.forEach(function (cluster) {
+      if (cluster.kind === "hub") {
+        drawHub(cluster);
+        return;
+      }
+      if (mapMode === "map") {
+        if (
+          cluster.kind === "directory" ||
+          cluster.kind === "logic" ||
+          cluster.kind === "file"
+        )
+          drawBranch(cluster);
+        return;
+      }
       if (cluster.kind !== "directory" && cluster.kind !== "logic") return;
       if (!cluster.nodes.some(isVisible)) return;
       drawCloud(cluster);
@@ -743,8 +1067,36 @@
     });
     var taken = [];
     clusters.forEach(function (cluster) {
+      if (cluster.kind === "hub") {
+        var hubPoint = toScreen(cluster.x, cluster.y);
+        paintLabel(
+          cluster.label,
+          hubPoint.x,
+          hubPoint.y - 28,
+          "#E8EEF8",
+          "13px ui-monospace, monospace",
+          "center",
+          true,
+          taken,
+        );
+        return;
+      }
       if (cluster.kind !== "directory" && cluster.kind !== "logic") return;
       if (!cluster.nodes.some(isVisible)) return;
+      if (mapMode === "map" && typeof cluster.x === "number") {
+        var dirPoint = toScreen(cluster.x, cluster.y);
+        paintLabel(
+          cluster.label,
+          dirPoint.x,
+          dirPoint.y - 18,
+          cluster.kind === "logic" ? "#D2B4FF" : "rgba(0,242,254,0.9)",
+          "12px ui-monospace, monospace",
+          "center",
+          true,
+          taken,
+        );
+        return;
+      }
       var top = null;
       cluster.nodes.forEach(function (node) {
         if (!isVisible(node)) return;
@@ -764,32 +1116,43 @@
       );
     });
     clusters.forEach(function (cluster) {
-      if (
-        cluster.kind !== "file" ||
-        cluster.nodes.length < 2 ||
-        !cluster.nodes.some(isVisible)
-      )
-        return;
+      if (cluster.kind !== "file" || !cluster.nodes.some(isVisible)) return;
+      if (mapMode !== "map" && cluster.nodes.length < 2) return;
       var point = toScreen(cluster.x, cluster.y);
       paintLabel(
         cluster.label,
         point.x,
-        point.y - 22 - cluster.nodes.length * 3,
+        mapMode === "map"
+          ? point.y - 16
+          : point.y - 22 - cluster.nodes.length * 3,
         "rgba(0,242,254,0.8)",
         "11px ui-monospace, monospace",
         "center",
-        false,
+        mapMode === "map",
         taken,
       );
     });
     nodes.forEach(function (node) {
       if (node.role !== "changed" || !isVisible(node)) return;
       var point = toScreen(node.x, node.y);
+      var forced = node === hover || node === selected;
+      if (mapMode === "map") {
+        paintLabel(
+          trimName(node.name),
+          point.x + node.r + 10,
+          point.y + 4,
+          forced ? "#E8EEF8" : "rgba(232,238,248,0.9)",
+          "12px ui-monospace, monospace",
+          "left",
+          true,
+          taken,
+        );
+        return;
+      }
       var anchor = fileAnchor(node);
       var dx = point.x - anchor.x;
       var dy = point.y - anchor.y;
       var length = Math.sqrt(dx * dx + dy * dy) || 1;
-      var forced = node === hover || node === selected;
       paintLabel(
         trimName(node.name),
         point.x + (dx / length) * (node.r + 10),
@@ -803,7 +1166,115 @@
     });
   }
 
+  function drawAgentMap() {
+    var taken = [];
+    mapStars.forEach(function (star) {
+      var point = toScreen(star.x, star.y);
+      var hot = star === hoverMap || star === selectedMap;
+      var color = star.finding
+        ? "#FFB020"
+        : star.depth === 0
+          ? "#00F2FE"
+          : star.depth === 1
+            ? "#D2B4FF"
+            : "#00F2FE";
+      var radius = star.r * (hot ? 1.35 : 1);
+      var glow = context.createRadialGradient(
+        point.x,
+        point.y,
+        0,
+        point.x,
+        point.y,
+        radius * 6,
+      );
+      glow.addColorStop(0, color);
+      glow.addColorStop(1, "rgba(11,15,25,0)");
+      context.fillStyle = glow;
+      context.globalAlpha = 0.85;
+      context.beginPath();
+      context.arc(point.x, point.y, radius * 6, 0, Math.PI * 2);
+      context.fill();
+      context.globalAlpha = 1;
+      context.beginPath();
+      if (star.depth === 1) {
+        context.moveTo(point.x, point.y - radius);
+        context.lineTo(point.x + radius, point.y);
+        context.lineTo(point.x, point.y + radius);
+        context.lineTo(point.x - radius, point.y);
+        context.closePath();
+      } else context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      context.fillStyle = color;
+      context.fill();
+      if (star === selectedMap) {
+        context.strokeStyle = "rgba(232,238,248,0.85)";
+        context.lineWidth = 1.25;
+        context.beginPath();
+        context.arc(point.x, point.y, radius + 7, 0, Math.PI * 2);
+        context.stroke();
+      }
+      if (star.labelAbove) {
+        paintLabel(
+          trimName(star.label),
+          point.x,
+          point.y - radius - 14,
+          hot ? "#E8EEF8" : "rgba(232,238,248,0.92)",
+          star.depth === 0
+            ? "13px ui-monospace, monospace"
+            : "12px ui-monospace, monospace",
+          "center",
+          true,
+          taken,
+        );
+      } else {
+        paintLabel(
+          trimName(star.label),
+          point.x + radius + 10,
+          point.y + 4,
+          hot ? "#E8EEF8" : "rgba(232,238,248,0.92)",
+          "12px ui-monospace, monospace",
+          "left",
+          true,
+          taken,
+        );
+      }
+    });
+  }
+
+  function mapStarAt(x, y) {
+    if (!usingAgentMap()) return null;
+    var found = null;
+    var best = Infinity;
+    mapStars.forEach(function (star) {
+      var point = toScreen(star.x, star.y);
+      var dx = x - point.x;
+      var dy = y - point.y;
+      var distance = Math.sqrt(dx * dx + dy * dy);
+      var width = Math.min(168, trimName(star.label).length * 7.2);
+      var labelHit;
+      if (star.labelAbove) {
+        labelHit =
+          x >= point.x - width / 2 - 8 &&
+          x <= point.x + width / 2 + 8 &&
+          y >= point.y - star.r - 28 &&
+          y <= point.y - star.r - 2;
+      } else {
+        var labelX = point.x + star.r + 10;
+        labelHit =
+          x >= labelX - 8 &&
+          x <= labelX + width + 8 &&
+          y >= point.y - 12 &&
+          y <= point.y + 10;
+      }
+      var hit = distance <= Math.max(32, star.r * 6 + 14) || labelHit;
+      if (!hit || distance >= best) return;
+      best = distance;
+      found = star;
+    });
+    return found;
+  }
+
   function nodeAt(x, y) {
+    if (usingAgentMap()) return null;
     var found = null;
     var best = Infinity;
     nodes.forEach(function (node) {
@@ -824,13 +1295,23 @@
   }
 
   function labelContains(node, point, x, y) {
+    var width = Math.min(168, trimName(node.name).length * 7.2);
+    if (mapMode === "map") {
+      var mapX = point.x + node.r + 10;
+      var mapY = point.y + 4;
+      return (
+        x >= mapX - 8 &&
+        x <= mapX + width + 8 &&
+        y >= mapY - 16 &&
+        y <= mapY + 8
+      );
+    }
     var anchor = fileAnchor(node);
     var dx = point.x - anchor.x;
     var dy = point.y - anchor.y;
     var length = Math.sqrt(dx * dx + dy * dy) || 1;
     var labelX = point.x + (dx / length) * (node.r + 10);
     var labelY = point.y + (dy / length) * (node.r + 10) + 4;
-    var width = Math.min(168, trimName(node.name).length * 7.2);
     var left = dx < 0 ? labelX - width : labelX;
     return (
       x >= left - 8 &&
@@ -852,6 +1333,13 @@
     if (left > width - 280) left = Math.max(8, x - 280);
     tip.style.left = left + "px";
     tip.style.top = Math.max(8, y + 14) + "px";
+    if (node.label && node.paths !== undefined) {
+      var bits = [node.label];
+      if (node.finding) bits.push("cusp");
+      if (node.paths && node.paths.length) bits.push(node.paths.join(", "));
+      tip.textContent = bits.join(" · ");
+      return;
+    }
     var cusp =
       node.findings.length > 0
         ? " · " + node.findings[0].id + " " + node.findings[0].severity
@@ -896,6 +1384,29 @@
     }
   }
 
+  function showMapDetail(star) {
+    if (!detail) return;
+    detail.textContent = "";
+    document.querySelectorAll("[data-index]").forEach(function (button) {
+      button.classList.remove("is-on");
+    });
+    if (!star) {
+      addText("p", "Lens", "eyebrow");
+      addText(
+        "p",
+        "Select a mindmap star. Click it again, or the empty sky, to clear it.",
+      );
+      return;
+    }
+    addText("p", star.finding ? "cusp · change map" : "change map", "eyebrow");
+    addText("h2", star.label);
+    if (star.detail) addText("p", star.detail);
+    if (star.paths && star.paths.length)
+      addText("p", star.paths.join(", "), "mono");
+    if (star.symbols && star.symbols.length)
+      addText("p", "Symbols · " + star.symbols.join(", "));
+  }
+
   function showDetail(node) {
     if (!detail) return;
     detail.textContent = "";
@@ -909,7 +1420,9 @@
       addText("p", "Lens", "eyebrow");
       addText(
         "p",
-        "Select a star. Click it again, or the empty sky, to clear it.",
+        usingAgentMap()
+          ? "Select a mindmap star. Click it again, or the empty sky, to clear it."
+          : "Select a star. Click it again, or the empty sky, to clear it.",
       );
       return;
     }
@@ -1215,6 +1728,16 @@
       setCanvasCursor(false);
       return;
     }
+    if (usingAgentMap()) {
+      var nextMap = mapStarAt(point.x, point.y);
+      if (nextMap !== hoverMap) {
+        hoverMap = nextMap;
+        setCanvasCursor(Boolean(hoverMap) && !spaceDown);
+        scheduleDraw();
+      } else setCanvasCursor(Boolean(hoverMap) && !spaceDown);
+      showTip(hoverMap, point.x, point.y);
+      return;
+    }
     var next = nodeAt(point.x, point.y);
     if (next !== hover) {
       hover = next;
@@ -1226,6 +1749,36 @@
 
   canvas.addEventListener("mousedown", function (event) {
     var point = localPoint(event);
+    if (usingAgentMap()) {
+      var star = mapStarAt(point.x, point.y);
+      down = {
+        x: point.x,
+        y: point.y,
+        node: null,
+        map: spaceDown ? null : star,
+        wasMap: selectedMap,
+        moved: false,
+      };
+      if (spaceDown || event.button === 1 || !star) {
+        pan = { x: point.x, y: point.y };
+        setCanvasCursor(false);
+        return;
+      }
+      var mapWorld = toWorld(point.x, point.y);
+      drag = {
+        node: star,
+        dx: star.x - mapWorld.x,
+        dy: star.y - mapWorld.y,
+      };
+      if (selectedMap !== star) {
+        selectedMap = star;
+        selected = null;
+        showMapDetail(star);
+        revealLensDetail();
+        scheduleDraw();
+      }
+      return;
+    }
     var node = nodeAt(point.x, point.y);
     down = {
       x: point.x,
@@ -1243,6 +1796,7 @@
     drag = { node: node, dx: node.x - world.x, dy: node.y - world.y };
     if (selected !== node) {
       selected = node;
+      selectedMap = null;
       showDetail(node);
       revealLensDetail();
       scheduleDraw();
@@ -1251,8 +1805,9 @@
 
   canvas.addEventListener("mouseleave", function () {
     setCanvasCursor(false);
-    if (hover) {
+    if (hover || hoverMap) {
       hover = null;
+      hoverMap = null;
       scheduleDraw();
     }
     if (tip) tip.hidden = true;
@@ -1260,17 +1815,26 @@
 
   window.addEventListener("mouseup", function () {
     if (down && !down.moved && !spaceDown) {
-      var sameStar = down.node && down.was === down.node;
-      if (sameStar || (!down.node && selected)) {
-        selected = null;
-        showDetail(null);
-        scheduleDraw();
+      if (usingAgentMap()) {
+        var sameMap = down.map && down.wasMap === down.map;
+        if (sameMap || (!down.map && selectedMap)) {
+          selectedMap = null;
+          showMapDetail(null);
+          scheduleDraw();
+        }
+      } else {
+        var sameStar = down.node && down.was === down.node;
+        if (sameStar || (!down.node && selected)) {
+          selected = null;
+          showDetail(null);
+          scheduleDraw();
+        }
       }
     }
     drag = null;
     pan = null;
     down = null;
-    setCanvasCursor(Boolean(hover) && !spaceDown);
+    setCanvasCursor(Boolean(usingAgentMap() ? hoverMap : hover) && !spaceDown);
   });
 
   canvas.addEventListener(
@@ -1343,6 +1907,42 @@
   var lensIn = document.getElementById("lens-in");
   var lensOut = document.getElementById("lens-out");
   var lensFit = document.getElementById("lens-fit");
+  var mapMind = document.getElementById("map-mind");
+  var mapSky = document.getElementById("map-sky");
+  var mapHint = document.getElementById("map-hint");
+  function setMapMode(mode) {
+    if (mode !== "map" && mode !== "sky") return;
+    if (mapMode === mode) return;
+    mapMode = mode;
+    if (mapMind) {
+      mapMind.classList.toggle("is-on", mode === "map");
+      mapMind.setAttribute("aria-pressed", mode === "map" ? "true" : "false");
+    }
+    if (mapSky) {
+      mapSky.classList.toggle("is-on", mode === "sky");
+      mapSky.setAttribute("aria-pressed", mode === "sky" ? "true" : "false");
+    }
+    if (mapHint) {
+      mapHint.textContent =
+        mode === "map"
+          ? usingAgentMap() || activeMindmap()
+            ? "Map: agent change mindmap · orange = cusp. Scroll pans · Shift+scroll sideways · Ctrl/⌘+scroll zooms · Space+drag pans."
+            : "Map: AST fallback until the review writes a mindmap. Scroll pans · Shift+scroll sideways · Ctrl/⌘+scroll zooms · Space+drag pans."
+          : "Sky: orbital constellation · Cloud = directory. Violet = group. Orange = finding. Scroll pans · Shift+scroll sideways · Ctrl/⌘+scroll zooms · Space+drag pans.";
+    }
+    moved = false;
+    layout();
+    fitCamera();
+    scheduleDraw();
+  }
+  if (mapMind)
+    mapMind.addEventListener("click", function () {
+      setMapMode("map");
+    });
+  if (mapSky)
+    mapSky.addEventListener("click", function () {
+      setMapMode("sky");
+    });
   if (lensIn)
     lensIn.addEventListener("click", function () {
       zoom(1.15);
@@ -1731,6 +2331,11 @@
         item.setAttribute("aria-pressed", on ? "true" : "false");
       });
       applyUnitPanel();
+      if (mapMode === "map") {
+        moved = false;
+        layout();
+        fitCamera();
+      }
       scheduleDraw();
     });
   });

@@ -201,8 +201,11 @@ export function renderConstellation(graph: Graph): string {
     .c-w { grid-column: 1; grid-row: 2; align-self: center; }
     .lens-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line); }
     .hint { margin: 0; max-width: 56ch; color: var(--muted); font-size: 11px; letter-spacing: 0.04em; line-height: 1.45; text-align: right; }
-    .lens-controls { display: flex; gap: 8px; }
-    .lens-controls button { border-radius: 10px; min-height: 36px; }
+    .lens-tools { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .map-mode { display: flex; gap: 6px; align-items: center; padding-right: 16px; border-right: 1px solid var(--line); }
+    .map-mode button { min-height: 36px; border-radius: 999px; padding: 6px 12px; }
+    .lens-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .lens-controls > button { border-radius: 10px; min-height: 36px; }
     aside { overflow: hidden; border-left: 1px solid var(--line); padding: 0; background: var(--panel); display: flex; min-height: 0; }
     .aside-shell { display: grid; grid-template-columns: minmax(0, 1fr) 56px; flex: 1; min-height: 0; width: 100%; }
     .aside-tabs { display: flex; flex-direction: column; gap: 6px; padding: 12px 8px; border-left: 1px solid var(--line); background: rgba(0, 0, 0, 0.18); }
@@ -394,16 +397,22 @@ export function renderConstellation(graph: Graph): string {
   </div>
   <main>
     <section class="sky" tabindex="0" aria-label="Change map. Scroll pans up and down. Shift+scroll pans left and right. Ctrl or Cmd+scroll zooms. Space+drag pans. Arrow keys move. Plus and minus zoom.">
-      <p class="sr">${graph.summary.symbols} changed symbols and ${graph.summary.neighbors} neighbors. A cyan cloud is one directory. A violet dashed cloud is a group named in the review. A line is an import or a call. Logic is a circle, contract is a diamond, text is a square, and orbit neighbors are rings. An orange shape marks a finding on that symbol; one finding can cover several files or symbols. Scroll pans. Shift+scroll pans sideways. Ctrl or Cmd+scroll zooms. Hold Space and drag to pan.</p>
+      <p class="sr">${graph.summary.symbols} changed symbols and ${graph.summary.neighbors} neighbors. The main Map view is the agent-authored change mindmap from the review. Sky is the orbital constellation of mapped symbols. A cyan cloud is one directory. A violet dashed cloud is a group named in the review. A line is an import or a call. Logic is a circle, contract is a diamond, text is a square, and orbit neighbors are rings. An orange shape marks a finding on that symbol; one finding can cover several files or symbols. Scroll pans. Shift+scroll pans sideways. Ctrl or Cmd+scroll zooms. Hold Space and drag to pan.</p>
       <canvas id="sky"></canvas>
       <div id="tip" hidden></div>
       <div class="lens-bar">
-        <div class="lens-controls">
-          <button type="button" id="lens-in">Lens in</button>
-          <button type="button" id="lens-out">Lens out</button>
-          <button type="button" id="lens-fit">Fit</button>
+        <div class="lens-tools">
+          <div class="map-mode view-toggle" role="group" aria-label="Constellation layout">
+            <button type="button" id="map-mind" class="is-on" aria-pressed="true">Map</button>
+            <button type="button" id="map-sky" aria-pressed="false">Sky</button>
+          </div>
+          <div class="lens-controls" role="group" aria-label="Camera">
+            <button type="button" id="lens-in">Lens in</button>
+            <button type="button" id="lens-out">Lens out</button>
+            <button type="button" id="lens-fit">Fit</button>
+          </div>
         </div>
-        <p class="hint">Scroll pans · Shift+scroll sideways · Ctrl/⌘+scroll zooms · Space+drag pans. Cloud = directory. Violet = group. Orange = finding.</p>
+        <p class="hint" id="map-hint">Map: agent change mindmap · Sky: orbital constellation. Scroll pans · Shift+scroll sideways · Ctrl/⌘+scroll zooms · Space+drag pans. Orange = cusp.</p>
       </div>
     </section>
     <button type="button" class="aside-split" id="aside-split" aria-label="Resize review panel" title="Drag to resize"></button>

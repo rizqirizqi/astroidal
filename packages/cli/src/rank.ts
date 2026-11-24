@@ -12,6 +12,7 @@ import type {
   FindingLocation,
   Graph,
   GraphUnit,
+  MindmapNode,
   RankedFinding,
   ReviewGroup,
   Severity,
@@ -81,6 +82,8 @@ export interface RankResult {
   agentScores: AgentScores | null;
   summary: ChangeSummary | null;
   unitSummaries: Record<string, ChangeSummary>;
+  mindmap: MindmapNode | null;
+  unitMindmaps: Record<string, MindmapNode>;
   covered: boolean;
   missing: string[];
 }
@@ -258,6 +261,8 @@ export function rankFindings(
     agentScores: readAgentScores(input),
     summary: readChangeSummary(input),
     unitSummaries: readUnitSummaries(input, graph),
+    mindmap: readMindmap(input, graph),
+    unitMindmaps: readUnitMindmaps(input, graph),
     covered: missing.length === 0,
     missing,
   };
@@ -285,6 +290,7 @@ export function renderReview(graph: Graph, result: RankResult): string {
         ]
       : []),
     ...summaryLines(graph.changeSummary, "Changes"),
+    ...mindmapLines(graph.mindmap, "Change map"),
     ...unitVerdicts(graph),
     "Chart: `.astroidal/constellation.html`",
     "",
@@ -332,6 +338,7 @@ export function assignUnitScores(
   missing: string[],
   agentScores: AgentScores | null,
   unitSummaries: Record<string, ChangeSummary> = {},
+  unitMindmaps: Record<string, MindmapNode> = {},
 ): void {
   const open = new Set(missing);
   const baseline = graph.baseline
@@ -384,6 +391,12 @@ export function assignUnitScores(
       unitSummaries[unit.label];
     if (summary) unit.changeSummary = summary;
     else delete unit.changeSummary;
+    const mindmap =
+      unitMindmaps[unit.id] ??
+      (unit.pr != null ? unitMindmaps[String(unit.pr)] : undefined) ??
+      unitMindmaps[unit.label];
+    if (mindmap) unit.mindmap = mindmap;
+    else delete unit.mindmap;
   }
 }
 
@@ -394,6 +407,7 @@ function unitVerdicts(graph: Graph): string[] {
     const block = [
       `${unit.label}: ${unit.score.value} · ${verdictLabel(unit.score.verdict)}`,
       ...summaryLines(unit.changeSummary, unit.label),
+      ...mindmapLines(unit.mindmap, `${unit.label} map`),
     ];
     return block;
   });
@@ -409,6 +423,31 @@ function summaryLines(
   for (const bullet of summary.bullets) lines.push(`- ${bullet}`);
   if (summary.bullets.length > 0) lines.push("");
   return lines;
+}
+
+function mindmapLines(
+  mindmap: MindmapNode | null | undefined,
+  title: string,
+): string[] {
+  if (!mindmap) return [];
+  const lines = [`## ${title}`, "", `- ${mindmap.label}`];
+  walkMindmapOutline(mindmap.children ?? [], 1, lines);
+  lines.push("");
+  return lines;
+}
+
+function walkMindmapOutline(
+  nodes: MindmapNode[],
+  depth: number,
+  lines: string[],
+): void {
+  const pad = "  ".repeat(depth);
+  for (const node of nodes) {
+    const mark = node.finding ? " (cusp)" : "";
+    lines.push(`${pad}- ${node.label}${mark}`);
+    if (node.children?.length)
+      walkMindmapOutline(node.children, depth + 1, lines);
+  }
 }
 
 function findingInUnit(
@@ -713,6 +752,118 @@ function parseChangeSummary(value: unknown): ChangeSummary | null {
         .slice(0, 12)
     : [];
   return { headline: headline.slice(0, 280), bullets };
+}
+
+function knownPaths(graph: Graph): Set<string> {
+  return new Set([
+    ...(graph.files ?? []).map((file) => file.path),
+    ...(graph.neighbors ?? []).map((neighbor) => neighbor.path),
+  ]);
+}
+
+function knownSymbols(graph: Graph): Set<string> {
+  return new Set(
+    (graph.nodes ?? [])
+      .filter((node) => node.kind !== "file")
+      .map((node) => node.name),
+  );
+}
+
+function readMindmap(input: unknown, graph: Graph): MindmapNode | null {
+  if (typeof input !== "object" || input === null) return null;
+  const record = input as { mindmap?: unknown };
+  return parseMindmap(record.mindmap, knownPaths(graph), knownSymbols(graph));
+}
+
+function readUnitMindmaps(
+  input: unknown,
+  graph: Graph,
+): Record<string, MindmapNode> {
+  if (typeof input !== "object" || input === null) return {};
+  const record = input as { unitMindmaps?: unknown };
+  if (
+    typeof record.unitMindmaps !== "object" ||
+    record.unitMindmaps === null ||
+    Array.isArray(record.unitMindmaps)
+  )
+    return {};
+  const paths = knownPaths(graph);
+  const symbols = knownSymbols(graph);
+  const raw = record.unitMindmaps as Record<string, unknown>;
+  const out: Record<string, MindmapNode> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    const mindmap = parseMindmap(value, paths, symbols);
+    if (!mindmap) continue;
+    out[key] = mindmap;
+    const unit = graph.units.find(
+      (item) =>
+        item.id === key ||
+        item.label === key ||
+        (item.pr != null && String(item.pr) === key),
+    );
+    if (unit) out[unit.id] = mindmap;
+  }
+  return out;
+}
+
+function parseMindmap(
+  value: unknown,
+  paths: Set<string>,
+  symbols: Set<string>,
+  depth = 0,
+  budget = { nodes: 40 },
+): MindmapNode | null {
+  if (budget.nodes <= 0 || depth > 5) return null;
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as {
+    label?: unknown;
+    detail?: unknown;
+    paths?: unknown;
+    symbols?: unknown;
+    finding?: unknown;
+    children?: unknown;
+  };
+  const label =
+    typeof record.label === "string" ? record.label.trim().slice(0, 80) : "";
+  if (!label) return null;
+  budget.nodes -= 1;
+  const detail =
+    typeof record.detail === "string" ? record.detail.trim().slice(0, 160) : "";
+  const nodePaths = Array.isArray(record.paths)
+    ? [
+        ...new Set(
+          record.paths
+            .filter((path): path is string => typeof path === "string")
+            .map(normalizePath)
+            .filter((path) => paths.has(path)),
+        ),
+      ].slice(0, 12)
+    : [];
+  const nodeSymbols = Array.isArray(record.symbols)
+    ? [
+        ...new Set(
+          record.symbols
+            .filter((name): name is string => typeof name === "string")
+            .map((name) => name.trim())
+            .filter((name) => name.length > 0 && symbols.has(name)),
+        ),
+      ].slice(0, 12)
+    : [];
+  const children: MindmapNode[] = [];
+  if (Array.isArray(record.children)) {
+    for (const child of record.children) {
+      const parsed = parseMindmap(child, paths, symbols, depth + 1, budget);
+      if (parsed) children.push(parsed);
+      if (children.length >= 12) break;
+    }
+  }
+  const node: MindmapNode = { label };
+  if (detail) node.detail = detail;
+  if (nodePaths.length) node.paths = nodePaths;
+  if (nodeSymbols.length) node.symbols = nodeSymbols;
+  if (record.finding === true) node.finding = true;
+  if (children.length) node.children = children;
+  return node;
 }
 
 function findingSummary(

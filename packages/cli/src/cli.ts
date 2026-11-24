@@ -152,6 +152,8 @@ export function main(argv: string[]): number {
     graph.summary.reviewed = true;
     if (ranked.summary) graph.changeSummary = ranked.summary;
     else delete graph.changeSummary;
+    if (ranked.mindmap) graph.mindmap = ranked.mindmap;
+    else delete graph.mindmap;
     graph.score = scoreReview({
       impact: graph.impact,
       findings: ranked.findings,
@@ -177,6 +179,7 @@ export function main(argv: string[]): number {
       ranked.missing,
       ranked.agentScores,
       ranked.unitSummaries,
+      ranked.unitMindmaps,
     );
     const directory = join(root, ".astroidal");
     writeFileSync(

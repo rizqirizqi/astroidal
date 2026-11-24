@@ -183,6 +183,39 @@ Write `.astroidal/findings.json`:
       "bullets": ["PR-specific change"]
     }
   },
+  "mindmap": {
+    "label": "Short title of the change",
+    "children": [
+      {
+        "label": "Auth path",
+        "detail": "What this branch of the change does",
+        "paths": ["src/auth.ts", "src/session.ts"],
+        "children": [
+          {
+            "label": "Login binds the password",
+            "paths": ["src/auth.ts"],
+            "symbols": ["login"]
+          },
+          {
+            "label": "Session resume trusts the user id",
+            "paths": ["src/session.ts"],
+            "symbols": ["resume"]
+          }
+        ]
+      },
+      {
+        "label": "Cusps",
+        "children": [
+          {
+            "label": "Password can leak to logs",
+            "paths": ["src/auth.ts"],
+            "symbols": ["login"],
+            "finding": true
+          }
+        ]
+      }
+    ]
+  },
   "findings": [
     {
       "pr": 12,
@@ -221,9 +254,11 @@ One finding can cover several files or symbols. Prefer `locations` when the bug 
 
 `summary` (the change summary) is required for the constellation: one headline sentence plus a short bullet list of what changed. For a batch, also set `unitSummaries` keyed by pull request number or unit label. Local or single-PR maps only need that change `summary`. When there are findings, also put one ultra-short bullet per finding in the change `summary.bullets` (or the matching `unitSummaries` bullets), using that finding's plain `summary` field — issue and fix in one breath.
 
+`mindmap` is required for the constellation Map view. You author it: a diagram of the change as a person would explain it — flows, features, contracts, and risks — not a dump of AST symbols or every function the map already listed. Nest `children` by story. Prefer about 5–20 nodes total, depth at most four. Each node needs a short `label`. Optional `detail` is one plain sentence. Attach mapped `paths` and `symbols` when a node lands on real code so the chart can focus those stars. Set `"finding": true` on nodes that represent a filed cusp. For a batch, also set `unitMindmaps` keyed like `unitSummaries`. Omit empty `children`. Do not invent paths or symbols the map does not have — rank drops unknown ones.
+
 Say what breaks, name the symbol, and give the change that removes the bug. For security and architecture, say why that change holds. Do not hedge, restate the quoted line, or file a question. An empty `findings` array is valid only after the added lines of every non-test source file have been checked against the catalog and none of them contain an important bug.
 
-When changed files belong together for a reason the directory does not already show, name that group. The chart draws a directory on its own, and it draws an import as a line. A group is for a flow, a feature, or a shared contract that crosses those.
+When changed files belong together for a reason the directory does not already show, name that group. The Sky chart draws a directory on its own, and it draws an import as a line. A group is for a flow, a feature, or a shared contract that crosses those.
 
 ```json
 {
@@ -282,6 +317,7 @@ Update `.astroidal/findings.json`:
 - Complete `checked` for every non-test source file in Added lines
 - Set `agentScores` honestly after the deeper pass (high on an axis only when you would clear that surface; keep an axis low when doubt remains there and you found no cusp yet)
 - Refresh `summary` / `unitSummaries` so the constellation still describes the change
+- Refresh `mindmap` / `unitMindmaps` so the Map view still diagrams the change (flows and cusps, not an AST dump)
 
 Then rank again:
 
@@ -308,6 +344,9 @@ For a clear (`findings: []`):
 - Confirm `checked` lists every required non-test Added-lines file
 - Confirm every `agentScores` axis is at least 80 after Re-review
 - Confirm `summary` (and `unitSummaries` for a batch) still matches the change
+- Confirm `mindmap` (and `unitMindmaps` for a batch) still diagrams the change
+
+Also confirm the mindmap is present whenever you wrote findings: root label, nested children for the story of the change, cusp nodes marked `finding: true` when findings remain.
 
 If rank dropped a finding because the quote or path is wrong, fix that finding once and rank again. Do not invent a replacement bug to keep the count up. After that fix-up rank, do not rank again.
 

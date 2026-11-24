@@ -804,6 +804,101 @@ test("rank keeps a logical group and drops a path outside the map", () => {
   ]);
 });
 
+test("rank keeps an agent mindmap and drops unknown paths", () => {
+  const graph = {
+    files: [{ path: "src/auth.ts" }, { path: "src/session.ts" }],
+    neighbors: [],
+    units: [{ id: "u12", label: "PR 12", pr: 12 }],
+    nodes: [
+      { name: "login", kind: "function", path: "src/auth.ts" },
+      { name: "resume", kind: "function", path: "src/session.ts" },
+    ],
+  } as unknown as Graph;
+  const ranked = rankFindings(
+    graph,
+    {
+      findings: [],
+      mindmap: {
+        label: "Auth change",
+        children: [
+          {
+            label: "Login binds password",
+            paths: ["src/auth.ts", "src/missing.ts"],
+            symbols: ["login", "ghost"],
+            finding: true,
+          },
+          {
+            detail: "no label so drop",
+            paths: ["src/auth.ts"],
+          },
+        ],
+      },
+      unitMindmaps: {
+        "12": {
+          label: "PR auth",
+          children: [{ label: "Resume", paths: ["src/session.ts"] }],
+        },
+      },
+    },
+    () => null,
+  );
+  assert.deepEqual(ranked.mindmap, {
+    label: "Auth change",
+    children: [
+      {
+        label: "Login binds password",
+        paths: ["src/auth.ts"],
+        symbols: ["login"],
+        finding: true,
+      },
+    ],
+  });
+  assert.equal(ranked.unitMindmaps["12"]?.label, "PR auth");
+  assert.equal(ranked.unitMindmaps.u12?.label, "PR auth");
+  const review = renderReview(
+    {
+      ...graph,
+      mindmap: ranked.mindmap ?? undefined,
+      changeSummary: undefined,
+      score: {
+        value: 80,
+        verdict: "passed",
+        reason: "ok",
+        evidence: 1,
+        agentScores: null,
+        impact: {
+          blastRadius: 10,
+          complexityDelta: 0,
+          securityExposure: 0,
+          performanceImpact: 0,
+        },
+        breakdown: {
+          blast: { map: 10, agent: null, agentRisk: null, merged: 10 },
+          complexity: { map: 0, agent: null, agentRisk: null, merged: 0 },
+          security: { map: 0, agent: null, agentRisk: null, merged: 0 },
+          performance: { map: 0, agent: null, agentRisk: null, merged: 0 },
+        },
+      },
+      findings: [],
+      groups: [],
+      summary: {
+        files: 2,
+        symbols: 2,
+        neighbors: 0,
+        additions: 1,
+        deletions: 0,
+        riskTier: "lite",
+        truncated: false,
+        reviewed: true,
+      },
+    } as unknown as Graph,
+    ranked,
+  );
+  assert.match(review, /## Change map/);
+  assert.match(review, /Auth change/);
+  assert.match(review, /Login binds password \(cusp\)/);
+});
+
 test("graph and rank review a worktree without adding a dependency", () => {
   const root = makeRepo();
   const home = mkdtempSync(join(tmpdir(), "astroidal-home-"));
@@ -916,6 +1011,8 @@ test("graph and rank review a worktree without adding a dependency", () => {
     assert.match(html, /Bind the password instead of concatenating it/);
     assert.match(html, /A-001/);
     assert.match(html, /id="view-tree" class="is-on"/);
+    assert.match(html, /id="map-mind" class="is-on"/);
+    assert.match(html, /id="map-sky"/);
     assert.match(html, /id="symbol-list" hidden/);
     assert.match(html, /id="symbol-tree"/);
     assert.doesNotMatch(html, /id="symbol-tree" hidden/);
@@ -1912,6 +2009,8 @@ test("each pull request keeps its own verdict", () => {
     agentScores: clearScores,
     summary: graph.changeSummary,
     unitSummaries: {},
+    mindmap: null,
+    unitMindmaps: {},
     covered: true,
     missing: [],
   });

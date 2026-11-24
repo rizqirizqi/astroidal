@@ -60,6 +60,15 @@ export interface Lead {
   detail: string;
 }
 
+export interface MindmapNode {
+  label: string;
+  detail?: string;
+  paths?: string[];
+  symbols?: string[];
+  finding?: boolean;
+  children?: MindmapNode[];
+}
+
 export interface GraphUnit {
   id: string;
   label: string;
@@ -71,6 +80,7 @@ export interface GraphUnit {
   head?: string;
   score?: ReviewScore;
   changeSummary?: ChangeSummary;
+  mindmap?: MindmapNode;
 }
 
 export type Verdict = "passed" | "review" | "fix";
@@ -233,6 +243,7 @@ export interface Graph {
     reviewed: boolean;
   };
   changeSummary?: ChangeSummary;
+  mindmap?: MindmapNode;
   score: ReviewScore;
   files: GraphFile[];
   neighbors: GraphNeighbor[];
