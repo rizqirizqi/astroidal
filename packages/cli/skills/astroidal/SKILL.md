@@ -3,7 +3,8 @@ name: astroidal
 description: >-
   Reviews code with Astroidal, the AI code review map, scorer, and helper.
   Use when the user asks for a code review, pull request review, bug hunt,
-  security review, architecture review, UX-flow review, or to run Astroidal.
+  security review, architecture review, UX-flow review, to run Astroidal,
+  or to fix Astroidal findings then approve and merge reviewed pull requests.
   Works on one change, a commit, staged or unstaged edits, and a batch of
   pull requests.
 ---
@@ -245,6 +246,14 @@ Rank appends one row to `.astroidal/log.jsonl`: the head, the verdict, the score
 
 Read the verdict line rank prints. **`Review` is not done** — continue to Phase 3. `Fix first` and a clear small `Passed` still continue to Re-review (lighter) and Verification before Report.
 
+**When the verdict is `Review`, name what still needs review before you continue.** Say it in chat in a short list the person can act on. Pull the gaps from the rank output, `.astroidal/review.md` (`Still open:`), and your `agentScores`:
+
+- Missing `checked` paths (every non-test Added-lines file not yet marked)
+- Each `agentScores` axis below 80 (blast, complexity, security, performance), with the current number
+- Any blast-radius, architecture, or packet lead you have not walked yet
+
+Do not leave `Review` as a vague label. Example: `Still needs review: unchecked src/auth.ts, src/session.ts; security agent score 62; walk callers of login.` Then go into Re-review on those items.
+
 ---
 
 ## Phase 3 — Re-review
@@ -252,6 +261,8 @@ Read the verdict line rank prints. **`Review` is not done** — continue to Phas
 Go deeper than the first pass. This phase exists so a soft `Review` becomes either real findings (`Fix first`) or a covered, high-confidence clear (`Passed`).
 
 **Always run Re-review when the first rank says `Review`.** Also run it when impact, blast radius, architecture, or security packets look hot even if the first verdict was `Passed` or `Fix first` — deepen the hunt or stress-test the cusps. On a tiny calm `Passed` with full `checked`, a short confirmation pass is enough.
+
+Before the deeper hunt, restate the open list from the `Review` cue (unchecked paths, low axes, unfinished blast/architecture walks). Close each item on that list, or replace it with a gate-passing finding.
 
 Focus on:
 
@@ -275,7 +286,7 @@ Then rank again:
 npx --yes astroidal rank
 ```
 
-If this second rank is still `Review`, do not stop: finish any missing `checked` paths, raise or lower each `agentScores` axis to match the deeper pass, and keep hunting until you either file a real finding or can clear with high confidence on every axis. Rank allows a covered, high-confidence clear to become `Passed` even when map impact is high. Do not invent a bug to escape `Review`. Do not rank more than once more after Verification fixes quote/path drops.
+If this second rank is still `Review`, do not stop: print the updated "still needs review" list again, finish any missing `checked` paths, raise or lower each `agentScores` axis to match the deeper pass, and keep hunting until you either file a real finding or can clear with high confidence on every axis. Rank allows a covered, high-confidence clear to become `Passed` even when map impact is high. Do not invent a bug to escape `Review`. Do not rank more than once more after Verification fixes quote/path drops.
 
 ---
 
@@ -305,6 +316,76 @@ Write a short prose summary in chat. Open with a line the person can paste: `Ast
 
 - **Passed** — no important findings after Review + Re-review + Verification; every added block was checked; every impact-surface agent score is at least 80. A person can skip the detail.
 - **Fix first** — cusp alerts remain; name the highest-severity issues and the recommendations.
-- **Review** is only a mid-loop cue: coverage is incomplete or an `agentScores` axis is still below 80. Do not paste it as the final line.
+- **Review** is only a mid-loop cue: coverage is incomplete or an `agentScores` axis is still below 80. Do not paste it as the final line. If you must pause mid-loop, the pause message still lists exactly what remains to review.
 
-Do not paste `Review` as the final line. If rank somehow still says `Review` after Re-review and Verification, keep hunting or adjust `checked` / `agentScores` and rank once more until the verdict is `Passed` or `Fix first`. Then name the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart. The human still decides whether to merge.
+Do not paste `Review` as the final line. If rank somehow still says `Review` after Re-review and Verification, name the remaining gaps, keep hunting or adjust `checked` / `agentScores`, and rank once more until the verdict is `Passed` or `Fix first`. Then name the two output paths: `.astroidal/review.md` and `.astroidal/constellation.html`. Do not paste the findings table. Do not recreate the chart.
+
+During Phases 1–5, do not approve, merge, or push fixes unless the person already asked for that in the same request. After Report, wait for an explicit ask before the follow-up below.
+
+---
+
+## After review — Fix, approve, merge
+
+Run this only when the person asks to fix findings, approve, merge, land the PRs, or clear the Astroidal cusps. It is not part of the default review. Keep the five review phases free of approve/merge.
+
+Work one pull request at a time when the map is a batch. Prefer stack order (bottom / earliest base first) when `--stack` or dependent PRs are in play; otherwise use the order in `.astroidal/graph.json` units.
+
+### 1. Fix
+
+1. Read `.astroidal/findings.json` and `.astroidal/review.md`. For each cusp, apply the `recommendation` at the quoted path (and every `locations` entry). Prefer the smallest change that removes the bug.
+2. Do not invent drive-by refactors. Do not weaken tests to silence a finding.
+3. When the worktree is the PR branch (or you check it out), commit only if the person asked to commit. Use the repo's commit style.
+4. Re-run the review loop on the same scope: `graph` (same flags as before) → update findings → `rank` through Re-review and Verification until that unit is `Passed`, or report what still blocks.
+5. For a batch, fix and re-rank per PR (or one checkout at a time). A PR with remaining cusps stays `Fix first` — skip approve/merge for that PR.
+
+### 2. Approve
+
+Only approve a PR whose latest Astroidal verdict for that unit is `Passed` (no cusps). Confirm CI/checks the person cares about are green when the forge shows them.
+
+GitHub:
+
+```bash
+gh pr review <number> --approve --body "Astroidal Passed. Cusps clear."
+```
+
+Optional: post or refresh the score comment with `npx --yes astroidal comment --pr <number>` when the person wants the chart link on the PR.
+
+GitLab:
+
+```bash
+glab mr approve <number>
+```
+
+Do not approve your own PR if the forge or repo policy forbids it — say so and stop on that PR.
+
+### 3. Merge
+
+Only merge after approve (or when the person already approved and asked only to merge), and only when that PR is `Passed` with checks green.
+
+GitHub (prefer merge method already used on the repo; default squash when unknown and the person did not specify):
+
+```bash
+gh pr merge <number> --auto --squash
+```
+
+Drop `--auto` when they want an immediate merge. Use `--merge` or `--rebase` when that is the repo standard. Do not `--admin` or bypass required reviews unless they explicitly ask.
+
+GitLab:
+
+```bash
+glab mr merge <number>
+```
+
+After each merge, note the result in chat. If merge is blocked (conflicts, required reviewers, failing checks), stop on that PR, name the blocker, and continue only with other Passed PRs the person listed.
+
+### Batch standard
+
+When they ask to fix, approve, and merge **all** reviewed PRs:
+
+1. Build the list from the current map units that are pull requests.
+2. Fix every `Fix first` unit first; re-rank until `Passed` or leave it out of approve/merge with a clear reason.
+3. Approve every remaining `Passed` PR you are allowed to approve.
+4. Merge them in dependency order. Do not merge a child before its base PR when the stack requires it.
+5. End with a short tally: fixed / approved / merged / skipped (with why).
+
+Never force-push, never delete branches unless asked, and never merge a PR that still has Astroidal cusps.

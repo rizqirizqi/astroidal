@@ -18,7 +18,7 @@ import { writePackets } from "./packets.js";
 import { readRepoFile, resolveScope } from "./scope.js";
 import { postComment } from "./comment.js";
 import { assignUnitScores, rankFindings, renderReview } from "./rank.js";
-import type { Graph, GraphOptions } from "./types.js";
+import type { AgentScores, Graph, GraphOptions } from "./types.js";
 
 const HELP = `Astroidal is the AI code review map, scorer, and helper.
 It draws the blast radius, hands an agent a bug map, and scores the review into a clear verdict.
@@ -190,10 +190,14 @@ export function main(argv: string[]): number {
       renderConstellation(graph),
     );
     const verdict = verdictLabel(graph.score.verdict);
+    const reviewCue =
+      graph.score.verdict === "review"
+        ? `\nStill needs review: ${formatReviewGaps(ranked.missing, ranked.agentScores)}`
+        : "";
     console.log(
       [
         refreshGlobalSkill(),
-        `Kept ${ranked.findings.length} findings. Dropped ${ranked.dropped.length}.\nWrote .astroidal/review.md and updated .astroidal/constellation.html\nShare: Astroidal ${graph.score.value} · ${verdict} on ${graph.repoName}. The AI code review map. npx --yes astroidal graph`,
+        `Kept ${ranked.findings.length} findings. Dropped ${ranked.dropped.length}.\nWrote .astroidal/review.md and updated .astroidal/constellation.html\nShare: Astroidal ${graph.score.value} · ${verdict} on ${graph.repoName}. The AI code review map. npx --yes astroidal graph${reviewCue}`,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -234,6 +238,36 @@ function assertMappable(graph: Graph): void {
       .filter(Boolean)
       .join("\n"),
   );
+}
+
+function formatReviewGaps(
+  missing: string[],
+  agentScores: AgentScores | null,
+): string {
+  const parts: string[] = [];
+  if (missing.length > 0)
+    parts.push(`unchecked ${missing.map((path) => `\`${path}\``).join(", ")}`);
+  if (agentScores == null)
+    parts.push("set blast, complexity, security, and performance agent scores");
+  else {
+    const low = (
+      [
+        ["blast", agentScores.blast],
+        ["complexity", agentScores.complexity],
+        ["security", agentScores.security],
+        ["performance", agentScores.performance],
+      ] as const
+    ).filter(([, value]) => value < 80);
+    if (low.length > 0)
+      parts.push(
+        `agent scores below 80: ${low
+          .map(([axis, value]) => `${axis} ${value}`)
+          .join(", ")}`,
+      );
+  }
+  return parts.length > 0
+    ? parts.join("; ")
+    : "coverage or confidence still open";
 }
 
 function summarize(graph: Graph): string {
