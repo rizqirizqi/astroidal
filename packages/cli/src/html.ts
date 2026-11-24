@@ -206,8 +206,8 @@ export function renderConstellation(graph: Graph): string {
     .map-mode button { min-height: 36px; border-radius: 999px; padding: 6px 12px; }
     .lens-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .lens-controls > button { border-radius: 10px; min-height: 36px; }
-    aside { overflow: hidden; border-left: 1px solid var(--line); padding: 0; background: var(--panel); display: flex; min-height: 0; }
-    .aside-shell { display: grid; grid-template-columns: minmax(0, 1fr) 56px; flex: 1; min-height: 0; width: 100%; }
+    aside { overflow: hidden; border-left: 1px solid var(--line); padding: 0; background: var(--panel); display: flex; min-width: 0; min-height: 0; }
+    .aside-shell { display: grid; grid-template-columns: minmax(0, 1fr) 56px; flex: 1; min-width: 0; min-height: 0; width: 100%; }
     .aside-tabs { display: flex; flex-direction: column; gap: 6px; padding: 12px 8px; border-left: 1px solid var(--line); background: rgba(0, 0, 0, 0.18); }
     .aside-tabs button {
       position: relative;
@@ -240,9 +240,9 @@ export function renderConstellation(graph: Graph): string {
       color: var(--ink);
     }
     .aside-tabs button.is-on .tab-count { border-color: rgba(0, 242, 254, 0.45); color: var(--cyan); }
-    .aside-panels { min-height: 0; overflow: auto; padding: 16px 18px 24px; scroll-padding-top: 16px; }
+    .aside-panels { min-width: 0; min-height: 0; overflow: auto; overflow-x: hidden; padding: 16px 18px 24px; scroll-padding-top: 16px; }
     .aside-panels > [role="tabpanel"][hidden] { display: none !important; }
-    .panel-stack { display: grid; gap: 4px; }
+    .panel-stack { display: grid; gap: 4px; min-width: 0; max-width: 100%; }
     h2 { margin: 0 0 12px; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
     .verdict { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0 0 18px; }
     .verdict-fix { border-color: rgba(255, 176, 32, 0.7); }
@@ -288,16 +288,21 @@ export function renderConstellation(graph: Graph): string {
     .symbol-meta .add { color: #7ee787; }
     .symbol-meta .del { color: #ff9b94; }
     .symbol-meta .cx, .symbol-meta em { color: var(--violet-ink); font-style: normal; }
-    #detail { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0; background: rgba(255, 255, 255, 0.03); }
-    #detail h2 { color: var(--ink); letter-spacing: -0.03em; text-transform: none; font-size: 22px; margin: 4px 0; }
+    #detail { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0; background: rgba(255, 255, 255, 0.03); min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+    #detail h2 { color: var(--ink); letter-spacing: -0.03em; text-transform: none; font-size: 22px; margin: 4px 0; overflow-wrap: anywhere; word-break: break-word; }
     #detail .eyebrow { margin-bottom: 4px; }
-    #detail pre { white-space: pre-wrap; margin: 10px 0 0; font: 12px/1.5 "JetBrains Mono", ui-monospace, monospace; background: rgba(0, 0, 0, 0.28); padding: 10px; border-radius: 10px; }
-    .diff-review { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    #detail .mono, #detail p { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+    #detail .map-paths { display: grid; gap: 6px; margin: 8px 0 0; min-width: 0; }
+    #detail .map-paths .mono { margin: 0; }
+    #detail .alert-path { display: block; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: var(--cyan); font: 12px/1.4 "JetBrains Mono", ui-monospace, monospace; text-align: left; text-decoration: underline; text-underline-offset: 3px; white-space: normal; overflow-wrap: anywhere; word-break: break-word; cursor: pointer; }
+    #detail .alert-path:hover { color: var(--ink); }
+    #detail pre { white-space: pre-wrap; margin: 10px 0 0; font: 12px/1.5 "JetBrains Mono", ui-monospace, monospace; background: rgba(0, 0, 0, 0.28); padding: 10px; border-radius: 10px; overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
+    .diff-review { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; min-width: 0; max-width: 100%; }
     .diff-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); }
     .diff-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 560; }
     .diff-note, .diff-empty { margin: 0; padding: 8px 10px; color: var(--muted); font-size: 12px; }
-    .diff-body { max-height: min(62vh, 720px); overflow: auto; background: #070b12; }
-    .diff-table { width: max-content; min-width: 100%; border-collapse: collapse; font: 12px/1.55 "JetBrains Mono", ui-monospace, monospace; }
+    .diff-body { max-height: min(62vh, 720px); overflow: auto; background: #070b12; min-width: 0; max-width: 100%; }
+    .diff-table { width: max-content; min-width: 100%; max-width: none; border-collapse: collapse; font: 12px/1.55 "JetBrains Mono", ui-monospace, monospace; }
     .diff-table td { padding: 0; vertical-align: top; }
     .diff-table .ln, .diff-table .sign { color: #6d7c93; background: rgba(0, 0, 0, 0.28); user-select: none; text-align: right; }
     .diff-table .ln { min-width: 2.4em; padding: 0 8px; }

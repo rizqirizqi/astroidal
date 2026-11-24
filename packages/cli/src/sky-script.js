@@ -1402,9 +1402,62 @@
     addText("h2", star.label);
     if (star.detail) addText("p", star.detail);
     if (star.paths && star.paths.length)
-      addText("p", star.paths.join(", "), "mono");
+      renderMapPaths(star.paths, star.symbols || []);
     if (star.symbols && star.symbols.length)
       addText("p", "Symbols · " + star.symbols.join(", "));
+  }
+
+  function nodeForMapPath(path, symbols) {
+    var matches = nodes.filter(function (node) {
+      return node.path === path;
+    });
+    var changed = matches.filter(function (node) {
+      return node.role === "changed";
+    });
+    var pool = changed.length ? changed : matches;
+    if (!pool.length) return null;
+    if (symbols && symbols.length) {
+      var named = pool.filter(function (node) {
+        return symbols.indexOf(node.name) !== -1;
+      });
+      if (named.length) pool = named;
+    }
+    var nonFile = pool.filter(function (node) {
+      return node.kind !== "file";
+    });
+    return (nonFile.length ? nonFile : pool)[0];
+  }
+
+  function openMapPath(path, symbols) {
+    var node = nodeForMapPath(path, symbols);
+    if (!node) return;
+    focusNode(node);
+  }
+
+  function renderMapPaths(paths, symbols) {
+    var list = document.createElement("div");
+    list.className = "map-paths";
+    paths.forEach(function (path) {
+      var node = nodeForMapPath(path, symbols);
+      if (!node) {
+        var plain = document.createElement("p");
+        plain.className = "mono";
+        plain.textContent = path;
+        list.appendChild(plain);
+        return;
+      }
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "alert-path";
+      button.setAttribute("data-alert-path", path);
+      button.setAttribute("aria-label", "Open " + path + " in Sky");
+      button.textContent = path;
+      button.addEventListener("click", function () {
+        openMapPath(path, symbols);
+      });
+      list.appendChild(button);
+    });
+    detail.appendChild(list);
   }
 
   function showDetail(node) {
@@ -1666,7 +1719,9 @@
   }
 
   function focusNode(node) {
+    if (mapMode !== "sky") setMapMode("sky");
     selected = node;
+    selectedMap = null;
     showDetail(node);
     revealLensDetail();
     moved = true;
