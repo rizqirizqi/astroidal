@@ -107,7 +107,7 @@ export function renderConstellation(graph: Graph): string {
     button { cursor: pointer; }
     :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
     .sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-    header { display: flex; justify-content: space-between; gap: 24px; align-items: center; padding: 16px 24px 12px; }
+    body > header { display: flex; justify-content: space-between; gap: 24px; align-items: center; padding: 16px 24px 12px; }
     .brand { display: flex; gap: 14px; align-items: center; min-width: 0; }
     .mark { flex: 0 0 auto; filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.35)); }
     .eyebrow, .mono, small, .hint, .compass b, .tier { font-family: "JetBrains Mono", ui-monospace, monospace; }
@@ -123,7 +123,7 @@ export function renderConstellation(graph: Graph): string {
     .tier-trivial { color: var(--muted); }
     .scope { margin: 0; color: var(--muted); font-size: 13px; }
     .batch { display: flex; gap: 8px; overflow-x: auto; padding: 0 24px 12px; scrollbar-width: thin; align-items: stretch; }
-    .batch button, .lens-controls button, .view-toggle button, .symbols button, summary {
+    .batch button, .lens-controls button, .view-toggle button, .symbols button, .alert-open-detail, .alerts-back-summary, summary {
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.02);
       border-radius: 999px;
@@ -147,7 +147,7 @@ export function renderConstellation(graph: Graph): string {
     .batch .verdict-fix .batch-score { color: var(--amber); }
     .batch .verdict-passed .batch-score { color: var(--cyan); }
     .batch .verdict-review .batch-score { color: var(--violet-ink); }
-    .batch button:hover, .lens-controls button:hover, .view-toggle button:hover, .symbols button:hover, summary:hover { border-color: rgba(0, 242, 254, 0.55); }
+    .batch button:hover, .lens-controls button:hover, .view-toggle button:hover, .symbols button:hover, .alert-open-detail:hover, .alerts-back-summary:hover, summary:hover { border-color: rgba(0, 242, 254, 0.55); }
     .batch button.is-on { border-color: var(--cyan); color: var(--cyan); background: rgba(0, 242, 254, 0.08); }
     .batch .batch-unit.is-on .batch-findings { color: rgba(0, 242, 254, 0.78); }
     main {
@@ -317,27 +317,43 @@ export function renderConstellation(graph: Graph): string {
     .alert { color: var(--amber); }
     .alerts-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
     .alerts-head h2 { margin: 0; }
-    .alerts-wrap { margin: 0 0 16px; overflow-x: hidden; max-width: 100%; }
+    .alerts-wrap { margin: 0 0 16px; max-width: 100%; }
     .alerts-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
-    .alerts-table th, .alerts-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
+    .alerts-table th, .alerts-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
     .alerts-table th { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
-    .alerts-table th:nth-child(1), .alerts-table td:nth-child(1) { width: 3.2rem; }
-    .alerts-table th:nth-child(2), .alerts-table td:nth-child(2) { width: 4.2rem; }
-    .alerts-table th.summary-col, .alerts-table td.summary { width: auto; }
-    .alerts-table th.path-col, .alerts-table td.paths { width: 22%; }
-    .alerts-table th.pr-col, .alerts-table td.pr { width: 3.2rem; }
-    .alerts-table th.detail-col, .alerts-table td.detail-col { display: none; width: 22%; }
-    .alerts.show-details .alerts-table th.detail-col,
-    .alerts.show-details .alerts-table td.detail-col { display: table-cell; }
-    .alerts.show-details .alerts-table th.summary-col,
-    .alerts.show-details .alerts-table td.summary { width: 24%; }
+    .alerts-table col.col-id { width: 11%; }
+    .alerts-table col.col-sev { width: 14%; }
+    .alerts-table col.col-summary { width: 53%; }
+    .alerts-table col.col-pr { width: 10%; }
+    .alerts-table col.col-open { width: 12%; }
+    .alerts-table .alert-open-detail { padding: 4px 10px; font-size: 11px; white-space: nowrap; }
+    .alerts-detail-nav { display: none; margin: 0 0 12px; }
+    .alerts.show-details .alerts-detail-nav { display: block; }
+    .alerts-back-summary { font-size: 12px; }
+    .alert-card-is-focus { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(0, 242, 254, 0.35); }
+    .alerts-table th.pr-col, .alerts-table td.pr { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; word-break: normal; }
     .alerts-table .sev { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; color: var(--muted); white-space: nowrap; }
     .alerts-table tr.sev-critical .sev { color: var(--amber); }
     .alerts-table tr.sev-high .sev { color: var(--violet-ink); }
-    .alerts-table .issue, .alerts-table .fix, .alerts-table .summary { line-height: 1.4; white-space: normal; }
-    .alerts-table .paths { display: grid; gap: 4px; min-width: 0; }
-    .alerts .alert-path { display: block; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: var(--cyan); font: 12px/1.4 "JetBrains Mono", ui-monospace, monospace; text-align: left; text-decoration: underline; text-underline-offset: 3px; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
-    .alerts .alert-path:hover { color: var(--ink); }
+    .alerts-table .summary { line-height: 1.4; white-space: normal; }
+    .alerts-detail-view { display: none; gap: 12px; margin: 0; padding: 0; list-style: none; }
+    .alerts.show-details .alerts-summary-view { display: none; }
+    .alerts.show-details .alerts-detail-view { display: grid; }
+    .alert-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: rgba(255, 255, 255, 0.03); }
+    .alert-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; padding: 0; }
+    .alert-card-id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; font-weight: 560; }
+    .alert-card .sev { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; color: var(--muted); }
+    .alert-card.sev-critical .sev { color: var(--amber); }
+    .alert-card.sev-high .sev { color: var(--violet-ink); }
+    .alert-card-pr { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+    .alert-card-lead { margin: 8px 0 0; font-size: 13px; line-height: 1.45; }
+    .alert-card-block { margin: 12px 0 0; }
+    .alert-card-block h3 { margin: 0 0 6px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+    .alert-card-block p { margin: 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; word-break: break-word; }
+    .alert-card-paths { margin-top: 12px; display: grid; gap: 6px; }
+    .alert-card-paths h3 { margin: 0 0 4px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+    .alerts-detail-view .alert-path { display: block; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: var(--cyan); font: 12px/1.45 "JetBrains Mono", ui-monospace, monospace; text-align: left; text-decoration: underline; text-underline-offset: 3px; white-space: normal; overflow-wrap: anywhere; word-break: break-word; cursor: pointer; }
+    .alerts-detail-view .alert-path:hover { color: var(--ink); }
     .symbol-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
     .symbol-head h2 { margin: 0; }
     .view-toggle { display: flex; gap: 6px; }
@@ -364,7 +380,7 @@ export function renderConstellation(graph: Graph): string {
     @media (max-width: 860px) {
       html, body { height: auto; }
       body { display: block; }
-      header, .meta { align-items: flex-start; flex-direction: column; justify-items: start; }
+      body > header, .meta { align-items: flex-start; flex-direction: column; justify-items: start; }
       main { grid-template-columns: 1fr; }
       .aside-split { display: none; }
       .sky { height: 72vh; }
@@ -375,7 +391,7 @@ export function renderConstellation(graph: Graph): string {
       .hint { display: none; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .batch button, .aside-tabs button, .lens-controls button, .view-toggle button, .symbols button, .alerts-head button, summary { transition: none; }
+      .batch button, .aside-tabs button, .lens-controls button, .view-toggle button, .symbols button, .alerts-head button, .alert-open-detail, .alerts-back-summary, summary { transition: none; }
       .mark { filter: none; }
     }
   </style>
@@ -441,10 +457,6 @@ export function renderConstellation(graph: Graph): string {
           <section id="panel-findings" class="panel-stack" role="tabpanel" aria-labelledby="tab-findings" hidden>
             <div class="alerts-head">
               <h2>Cusp alerts</h2>
-              <div class="view-toggle" role="group" aria-label="Finding detail">
-                <button type="button" id="alerts-summary" class="is-on" aria-pressed="true">Summary</button>
-                <button type="button" id="alerts-detail" aria-pressed="false">Detail</button>
-              </div>
             </div>
             <div id="alerts-panel">${alerts}</div>
           </section>
@@ -539,35 +551,47 @@ function batchFilterButton(input: {
   return `<button type="button" class="batch-unit${verdictClass}${on}" data-filter="${escapeHtml(input.id)}" aria-pressed="${input.pressed ? "true" : "false"}" aria-label="${escapeHtml(aria)}"><span class="batch-label">${escapeHtml(input.label)}</span>${scoreLine}${findingLine}</button>`;
 }
 
+function alertPathButtons(finding: RankedFinding): string {
+  const locations =
+    finding.locations?.length > 0
+      ? finding.locations
+      : [
+          {
+            path: finding.path,
+            line: finding.line,
+            quote: finding.quote,
+            symbol: null as string | null,
+          },
+        ];
+  return locations
+    .map((location) => {
+      const line = location.line == null ? "" : `:${location.line}`;
+      const symbol = location.symbol ? ` (${escapeHtml(location.symbol)})` : "";
+      const label = `${location.path}${line}${location.symbol ? ` (${location.symbol})` : ""}`;
+      return `<button type="button" class="alert-path" data-alert-path="${escapeHtml(location.path)}" data-alert-line="${location.line ?? ""}" data-alert-id="${escapeHtml(finding.id)}" title="${escapeHtml(label)}" aria-label="Open ${escapeHtml(location.path)} in the lens">${escapeHtml(location.path)}${line}${symbol}</button>`;
+    })
+    .join("");
+}
+
+function alertCardMarkup(finding: RankedFinding): string {
+  const paths = alertPathButtons(finding);
+  const lead = finding.summary || finding.description;
+  return `<article class="alert-card sev-${finding.severity}" id="alert-card-${escapeHtml(finding.id)}" aria-labelledby="alert-${escapeHtml(finding.id)}-id"><header class="alert-card-head"><span class="alert-card-id" id="alert-${escapeHtml(finding.id)}-id">${escapeHtml(finding.id)}</span><span class="sev">${escapeHtml(finding.severity)}</span><span class="alert-card-pr">${escapeHtml(finding.pr)}</span></header><p class="alert-card-lead">${escapeHtml(lead)}</p><section class="alert-card-block"><h3>Issue</h3><p>${escapeHtml(finding.description)}</p></section><section class="alert-card-block"><h3>Recommendation</h3><p>${escapeHtml(finding.recommendation)}</p></section><section class="alert-card-paths"><h3>Path</h3>${paths}</section></article>`;
+}
+
 function alertsMarkup(findings: RankedFinding[]): string {
   if (findings.length === 0)
     return '<p class="quiet">No cusp alerts on this map.</p>';
   const rows = findings
-    .map((finding) => {
-      const locations =
-        finding.locations?.length > 0
-          ? finding.locations
-          : [
-              {
-                path: finding.path,
-                line: finding.line,
-                quote: finding.quote,
-                symbol: null as string | null,
-              },
-            ];
-      const buttons = locations
-        .map((location) => {
-          const line = location.line == null ? "" : `:${location.line}`;
-          const symbol = location.symbol
-            ? ` (${escapeHtml(location.symbol)})`
-            : "";
-          return `<button type="button" class="alert-path" data-alert-path="${escapeHtml(location.path)}" data-alert-line="${location.line ?? ""}" data-alert-id="${escapeHtml(finding.id)}" aria-label="Open ${escapeHtml(location.path)} in the lens">${escapeHtml(location.path)}${line}${symbol}</button>`;
-        })
-        .join("");
-      return `<tr class="sev-${finding.severity}"><td>${escapeHtml(finding.id)}</td><td class="sev">${escapeHtml(finding.severity)}</td><td class="summary">${escapeHtml(finding.summary || finding.description)}</td><td class="issue detail-col">${escapeHtml(finding.description)}</td><td class="fix detail-col">${escapeHtml(finding.recommendation)}</td><td class="paths">${buttons}</td><td class="pr">${escapeHtml(finding.pr)}</td></tr>`;
-    })
+    .map(
+      (finding) =>
+        `<tr class="sev-${finding.severity}"><td>${escapeHtml(finding.id)}</td><td class="sev">${escapeHtml(finding.severity)}</td><td class="summary">${escapeHtml(finding.summary || finding.description)}</td><td class="pr">${escapeHtml(finding.pr)}</td><td><button type="button" class="alert-open-detail" data-alert-open="${escapeHtml(finding.id)}" aria-label="Open detail for ${escapeHtml(finding.id)}">Detail</button></td></tr>`,
+    )
     .join("");
-  return `<div class="alerts-wrap alerts" id="alerts-table-wrap"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col" class="summary-col">Summary</th><th scope="col" class="detail-col">Issue</th><th scope="col" class="detail-col">Recommendation</th><th scope="col" class="path-col">Path</th><th scope="col" class="pr-col">PR</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const cards = findings.map(alertCardMarkup).join("");
+  const cols =
+    '<colgroup><col class="col-id"><col class="col-sev"><col class="col-summary"><col class="col-pr"><col class="col-open"></colgroup>';
+  return `<div class="alerts-wrap alerts" id="alerts-table-wrap"><div class="alerts-detail-nav"><button type="button" class="alerts-back-summary" id="alerts-back-summary">Summary list</button></div><div class="alerts-summary-view"><table class="alerts-table">${cols}<thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col" class="summary-col">Summary</th><th scope="col" class="pr-col">PR</th><th scope="col" class="open-col"><span class="sr">Detail</span></th></tr></thead><tbody>${rows}</tbody></table></div><div class="alerts-detail-view">${cards}</div></div>`;
 }
 
 function symbolButton(

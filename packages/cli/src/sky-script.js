@@ -2209,64 +2209,104 @@
 
   var showAlertDetails = false;
 
+  function alertPathButtons(finding) {
+    return findingLocations(finding)
+      .map(function (location) {
+        var line =
+          location.line == null || location.line === ""
+            ? ""
+            : ":" + location.line;
+        var symbol = location.symbol
+          ? " (" + escapeHtml(location.symbol) + ")"
+          : "";
+        var label =
+          location.path +
+          line +
+          (location.symbol ? " (" + location.symbol + ")" : "");
+        return (
+          '<button type="button" class="alert-path" data-alert-path="' +
+          escapeHtml(location.path) +
+          '" data-alert-line="' +
+          (location.line == null ? "" : location.line) +
+          '" data-alert-id="' +
+          escapeHtml(finding.id) +
+          '" title="' +
+          escapeHtml(label) +
+          '" aria-label="Open ' +
+          escapeHtml(location.path) +
+          ' in the lens">' +
+          escapeHtml(location.path) +
+          line +
+          symbol +
+          "</button>"
+        );
+      })
+      .join("");
+  }
+
+  function alertCardMarkup(finding) {
+    var paths = alertPathButtons(finding);
+    var lead = finding.summary || finding.description || "";
+    return (
+      '<article class="alert-card sev-' +
+      escapeHtml(finding.severity) +
+      '" id="alert-card-' +
+      escapeHtml(finding.id) +
+      '" aria-labelledby="alert-' +
+      escapeHtml(finding.id) +
+      '-id"><header class="alert-card-head"><span class="alert-card-id" id="alert-' +
+      escapeHtml(finding.id) +
+      '-id">' +
+      escapeHtml(finding.id) +
+      '</span><span class="sev">' +
+      escapeHtml(finding.severity) +
+      '</span><span class="alert-card-pr">' +
+      escapeHtml(finding.pr || "") +
+      '</span></header><p class="alert-card-lead">' +
+      escapeHtml(lead) +
+      '</p><section class="alert-card-block"><h3>Issue</h3><p>' +
+      escapeHtml(finding.description || "") +
+      '</p></section><section class="alert-card-block"><h3>Recommendation</h3><p>' +
+      escapeHtml(finding.recommendation || "") +
+      '</p></section><section class="alert-card-paths"><h3>Path</h3>' +
+      paths +
+      "</section></article>"
+    );
+  }
+
   function alertsMarkup(list) {
     if (!list || list.length === 0)
       return '<p class="quiet">No cusp alerts on this map.</p>';
+    var rows = list
+      .map(function (finding) {
+        return (
+          '<tr class="sev-' +
+          escapeHtml(finding.severity) +
+          '"><td>' +
+          escapeHtml(finding.id) +
+          '</td><td class="sev">' +
+          escapeHtml(finding.severity) +
+          '</td><td class="summary">' +
+          escapeHtml(finding.summary || finding.description || "") +
+          '</td><td class="pr">' +
+          escapeHtml(finding.pr || "") +
+          '</td><td><button type="button" class="alert-open-detail" data-alert-open="' +
+          escapeHtml(finding.id) +
+          '" aria-label="Open detail for ' +
+          escapeHtml(finding.id) +
+          '">Detail</button></td></tr>'
+        );
+      })
+      .join("");
+    var cards = list.map(alertCardMarkup).join("");
     return (
       '<div class="alerts-wrap alerts' +
       (showAlertDetails ? " show-details" : "") +
-      '" id="alerts-table-wrap"><table class="alerts-table"><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col" class="summary-col">Summary</th><th scope="col" class="detail-col">Issue</th><th scope="col" class="detail-col">Recommendation</th><th scope="col" class="path-col">Path</th><th scope="col" class="pr-col">PR</th></tr></thead><tbody>' +
-      list
-        .map(function (finding) {
-          var locations = findingLocations(finding);
-          var buttons = locations
-            .map(function (location) {
-              var line =
-                location.line == null || location.line === ""
-                  ? ""
-                  : ":" + location.line;
-              var symbol = location.symbol
-                ? " (" + escapeHtml(location.symbol) + ")"
-                : "";
-              return (
-                '<button type="button" class="alert-path" data-alert-path="' +
-                escapeHtml(location.path) +
-                '" data-alert-line="' +
-                (location.line == null ? "" : location.line) +
-                '" data-alert-id="' +
-                escapeHtml(finding.id) +
-                '" aria-label="Open ' +
-                escapeHtml(location.path) +
-                ' in the lens">' +
-                escapeHtml(location.path) +
-                line +
-                symbol +
-                "</button>"
-              );
-            })
-            .join("");
-          return (
-            '<tr class="sev-' +
-            escapeHtml(finding.severity) +
-            '"><td>' +
-            escapeHtml(finding.id) +
-            '</td><td class="sev">' +
-            escapeHtml(finding.severity) +
-            '</td><td class="summary">' +
-            escapeHtml(finding.summary || finding.description || "") +
-            '</td><td class="issue detail-col">' +
-            escapeHtml(finding.description) +
-            '</td><td class="fix detail-col">' +
-            escapeHtml(finding.recommendation || "") +
-            '</td><td class="paths">' +
-            buttons +
-            '</td><td class="pr">' +
-            escapeHtml(finding.pr || "") +
-            "</td></tr>"
-          );
-        })
-        .join("") +
-      "</tbody></table></div>"
+      '" id="alerts-table-wrap"><div class="alerts-detail-nav"><button type="button" class="alerts-back-summary" id="alerts-back-summary">Summary list</button></div><div class="alerts-summary-view"><table class="alerts-table"><colgroup><col class="col-id"><col class="col-sev"><col class="col-summary"><col class="col-pr"><col class="col-open"></colgroup><thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col" class="summary-col">Summary</th><th scope="col" class="pr-col">PR</th><th scope="col" class="open-col"><span class="sr">Detail</span></th></tr></thead><tbody>' +
+      rows +
+      '</tbody></table></div><div class="alerts-detail-view">' +
+      cards +
+      "</div></div>"
     );
   }
 
@@ -2274,21 +2314,47 @@
     showAlertDetails = mode === "detail";
     var wrap = document.getElementById("alerts-table-wrap");
     if (wrap) wrap.classList.toggle("show-details", showAlertDetails);
-    var summaryBtn = document.getElementById("alerts-summary");
-    var detailBtn = document.getElementById("alerts-detail");
-    if (summaryBtn) {
-      summaryBtn.classList.toggle("is-on", !showAlertDetails);
-      summaryBtn.setAttribute(
-        "aria-pressed",
-        showAlertDetails ? "false" : "true",
-      );
-    }
-    if (detailBtn) {
-      detailBtn.classList.toggle("is-on", showAlertDetails);
-      detailBtn.setAttribute(
-        "aria-pressed",
-        showAlertDetails ? "true" : "false",
-      );
+    document.querySelectorAll(".alert-card-is-focus").forEach(function (card) {
+      card.classList.remove("alert-card-is-focus");
+    });
+  }
+
+  function scrollAlertCardIntoView(alertId) {
+    if (!alertId) return;
+    var card = document.getElementById("alert-card-" + alertId);
+    var panel = document.querySelector(".aside-panels");
+    if (!card || !panel) return;
+    card.classList.add("alert-card-is-focus");
+    var offset =
+      card.getBoundingClientRect().top -
+      panel.getBoundingClientRect().top +
+      panel.scrollTop -
+      12;
+    panel.scrollTo({ top: Math.max(0, offset), behavior: "smooth" });
+    window.setTimeout(function () {
+      card.classList.remove("alert-card-is-focus");
+    }, 2200);
+  }
+
+  function openAlertDetail(alertId) {
+    setAlertDetailMode("detail");
+    requestAnimationFrame(function () {
+      scrollAlertCardIntoView(alertId);
+    });
+  }
+
+  function bindAlertOpen(root) {
+    if (!root) return;
+    root.querySelectorAll("[data-alert-open]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        openAlertDetail(button.getAttribute("data-alert-open") || "");
+      });
+    });
+    var back = root.querySelector("#alerts-back-summary");
+    if (back) {
+      back.addEventListener("click", function () {
+        setAlertDetailMode("summary");
+      });
     }
   }
 
@@ -2349,6 +2415,7 @@
     if (alertsPanel) {
       alertsPanel.innerHTML = alertsMarkup(list);
       bindAlertPaths(alertsPanel);
+      bindAlertOpen(alertsPanel);
     }
     var findingsCount = document.getElementById("findings-count");
     if (findingsCount) {
@@ -2359,16 +2426,6 @@
     applySymbolFilter();
   }
 
-  var alertsSummary = document.getElementById("alerts-summary");
-  var alertsDetail = document.getElementById("alerts-detail");
-  if (alertsSummary)
-    alertsSummary.addEventListener("click", function () {
-      setAlertDetailMode("summary");
-    });
-  if (alertsDetail)
-    alertsDetail.addEventListener("click", function () {
-      setAlertDetailMode("detail");
-    });
   setAlertDetailMode("summary");
 
   document.querySelectorAll(".aside-tabs [data-panel]").forEach(function (tab) {
@@ -2411,6 +2468,7 @@
   });
 
   bindAlertPaths(alertsPanel || document);
+  bindAlertOpen(alertsPanel || document);
 
   var symbolList = document.getElementById("symbol-list");
   var symbolTree = document.getElementById("symbol-tree");
